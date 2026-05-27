@@ -1,0 +1,174 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import "katex/dist/katex.min.css";
+@import "tailwindcss";
+
+@layer base {
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    @apply bg-slate-50 text-slate-900 antialiased;
+  }
+  
+  pre, code, .math-mono {
+    font-family: 'JetBrains Mono', monospace;
+  }
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9; /* slate-100 */
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1; /* slate-300 */
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8; /* slate-400 */
+}
+
+/* Interactive Math Graph Canvas Styling */
+.blueprint-grid {
+  background-image: 
+    linear-gradient(rgba(14, 116, 144, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(14, 116, 144, 0.08) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+/* ==========================================
+   Professional Polish Theme Code Mappings
+   ========================================== */
+
+/* Inner Workspace containers overrides */
+#workspace-controls-tab .bg-zinc-900 {
+  background-color: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #1e293b !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03) !important;
+}
+
+#workspace-controls-tab .bg-zinc-950 {
+  background-color: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+#workspace-controls-tab .bg-zinc-950\/50 {
+  background-color: #f1f5f9 !important;
+}
+
+#workspace-controls-tab .bg-zinc-900\/40 {
+  background-color: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+#workspace-controls-tab .border-zinc-800,
+#workspace-controls-tab .border-zinc-850,
+#workspace-controls-tab .border-zinc-855,
+#workspace-controls-tab .border-zinc-900 {
+  border-color: #e2e8f0 !important;
+}
+
+#workspace-controls-tab .text-zinc-50 {
+  color: #0c111d !important;
+}
+
+#workspace-controls-tab .text-zinc-100 {
+  color: #1e293b !important;
+}
+
+#workspace-controls-tab .text-zinc-200 {
+  color: #334155 !important;
+}
+
+#workspace-controls-tab .text-zinc-300 {
+  color: #475569 !important;
+}
+
+#workspace-controls-tab .text-zinc-400 {
+  color: #64748b !important;
+}
+
+#workspace-controls-tab .text-zinc-500 {
+  color: #94a3b8 !important;
+}
+
+#workspace-controls-tab .text-zinc-650 {
+  color: #475569 !important;
+}
+
+/* Button & interactive states correction */
+#workspace-controls-tab button.bg-zinc-950,
+#workspace-controls-tab .bg-zinc-950 button {
+  background-color: #f8fafc !important;
+  color: #475569 !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+#workspace-controls-tab button.bg-zinc-950:hover,
+#workspace-controls-tab .bg-zinc-950 button:hover {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+/* Overriding selected items / math sub-sections */
+#workspace-controls-tab .bg-indigo-950\/40 {
+  background-color: #e0e7ff !important;
+  border-color: #c7d2fe !important;
+  color: #312e81 !important;
+}
+
+/* Forms, textfields and selects */
+#workspace-controls-tab input,
+#workspace-controls-tab select,
+#workspace-controls-tab textarea {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+  border: 1px solid #cbd5e1 !important;
+}
+
+#workspace-controls-tab input:focus,
+#workspace-controls-tab select:focus,
+#workspace-controls-tab textarea:focus {
+  border-color: #6366f1 !important;
+  outline: none !important;
+}
+
+#workspace-controls-tab .text-indigo-400 {
+  color: #4f46e5 !important;
+}
+
+#workspace-controls-tab .text-amber-500 {
+  color: #d97706 !important;
+}
+
+#workspace-controls-tab .text-emerald-500, #workspace-controls-tab .text-green-400 {
+  color: #16a34a !important;
+}
+
+/* LaTeX KaTeX Container Theme */
+.katex-display, .katex {
+  color: #1e293b !important;
+}
+
+/* Dialog boxes / interactive math step indicator numbers */
+#workspace-controls-tab .bg-zinc-800 {
+  background-color: #f1f5f9 !important;
+  color: #475569 !important;
+}
+
+/* Red / failures overlay */
+#workspace-controls-tab .bg-red-950\/40 {
+  background-color: #fef2f2 !important;
+  border-color: #fee2e2 !important;
+  color: #991b1b !important;
+}
+
+/* Extra polishing classes for matrix calculation inputs cell */
+.matrix-input-cell {
+  background-color: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #0f172a !important;
+}
