@@ -79,4 +79,38 @@ class MathParityIntegrationTest {
             .andExpect(jsonPath("$.steps").isArray())
             .andExpect(jsonPath("$.latex").isString());
     }
+
+    @Test
+    void algebraUsesSymjaForExpandedSymbolicCoverage() throws Exception {
+        mockMvc.perform(post("/api/math/algebra")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "operation", "expand",
+                    "expression", "(x + y)^2",
+                    "variable", "x"
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.output").value("x^2+2*x*y+y^2"))
+            .andExpect(jsonPath("$.steps[2]").value("Computed symbolic result with Symja."));
+
+        mockMvc.perform(post("/api/math/algebra")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "operation", "simplify",
+                    "expression", "(x^2 - 1)/(x - 1)",
+                    "variable", "x"
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.output").value("1+x"));
+
+        mockMvc.perform(post("/api/math/algebra")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                    "operation", "factor",
+                    "expression", "x^3 - 1",
+                    "variable", "x"
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.output").value("(-1+x)*(1+x+x^2)"));
+    }
 }

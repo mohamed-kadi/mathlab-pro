@@ -31,7 +31,7 @@ MathLab Pro is useful today for local development, demos, and feature validation
 
 ## Near-Term Phase Plan
 
-1. Expand math modules with Symja-backed symbolic algebra while keeping Apache Commons Math and EJML behind service-layer boundaries.
+1. Expand math modules with Symja-backed symbolic algebra while keeping Apache Commons Math behind service-layer boundaries.
 2. Make Spring Boot the default backend after deployment packaging is complete.
 3. Add production Docker image and Compose/Kubernetes deployment path for the Spring Boot backend.
 4. Harden production deployment with secrets, Nginx/TLS, observability, backups, and rate limiting.

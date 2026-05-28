@@ -12,7 +12,7 @@ This is the Spring Boot production backend for MathLab Pro. It runs alongside th
 - Redis configuration for calculation caching
 - Spring WebSocket foundation
 - Springdoc OpenAPI UI
-- Apache Commons Math and EJML for deterministic math operations
+- Apache Commons Math and Symja for deterministic math operations
 - JUnit/MockMvc tests
 
 ## Local Commands

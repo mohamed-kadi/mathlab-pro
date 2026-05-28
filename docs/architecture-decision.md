@@ -18,7 +18,7 @@ The React + TypeScript frontend remains the primary client. Backend migration is
 - Authentication: Spring Security, JWT bearer tokens, BCrypt password hashing.
 - Persistence: PostgreSQL with Flyway migrations.
 - Cache: Redis for repeated calculations and high-cost math workflows.
-- Math libraries: Symja for symbolic algebra, Apache Commons Math for numerical methods/statistics, EJML for matrix operations.
+- Math libraries: Symja for symbolic algebra and Apache Commons Math for matrix operations, numerical methods, and statistics.
 - Realtime path: Spring WebSocket/STOMP for live calculations and future collaboration.
 - Testing: API contract tests first, then Java unit/integration tests once endpoints are ported.
 

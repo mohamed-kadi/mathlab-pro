@@ -9,25 +9,29 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.TimeUnit;
 import java.util.function.DoubleUnaryOperator;
 import java.util.regex.Pattern;
 import org.apache.commons.math3.analysis.UnivariateFunction;
 import org.apache.commons.math3.analysis.integration.SimpsonIntegrator;
 import org.apache.commons.math3.fitting.PolynomialCurveFitter;
 import org.apache.commons.math3.fitting.WeightedObservedPoints;
+import org.apache.commons.math3.linear.ArrayRealVector;
+import org.apache.commons.math3.linear.DecompositionSolver;
 import org.apache.commons.math3.linear.EigenDecomposition;
 import org.apache.commons.math3.linear.LUDecomposition;
+import org.apache.commons.math3.linear.MatrixUtils;
 import org.apache.commons.math3.linear.QRDecomposition;
 import org.apache.commons.math3.linear.RealMatrix;
 import org.apache.commons.math3.linear.RealVector;
-import org.apache.commons.math3.linear.MatrixUtils;
 import org.apache.commons.math3.stat.descriptive.moment.Mean;
 import org.apache.commons.math3.stat.descriptive.moment.StandardDeviation;
 import org.apache.commons.math3.stat.descriptive.moment.Variance;
 import org.apache.commons.math3.stat.descriptive.rank.Max;
 import org.apache.commons.math3.stat.descriptive.rank.Median;
 import org.apache.commons.math3.stat.descriptive.rank.Min;
-import org.ejml.simple.SimpleMatrix;
+import org.matheclipse.core.eval.ExprEvaluator;
+import org.matheclipse.core.interfaces.IExpr;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -36,7 +40,10 @@ public class MathEngineService {
 
     private static final double EPSILON = 1e-10;
     private static final int MAX_EXPRESSION_LENGTH = 1000;
+    private static final int MAX_SYMBOLIC_OUTPUT_LENGTH = 8000;
+    private static final long SYMBOLIC_TIMEOUT_SECONDS = 2;
     private static final Pattern VARIABLE_PATTERN = Pattern.compile("^[A-Za-z][A-Za-z0-9_]{0,15}$");
+    private static final Pattern SYMBOLIC_PATTERN = Pattern.compile("^[A-Za-z0-9_+\\-*/^().,=\\s]+$");
 
     public Map<String, Object> polynomial(Map<String, Object> request) {
         String operation = requiredString(request, "operation");
@@ -95,17 +102,12 @@ public class MathEngineService {
     public Map<String, Object> algebra(Map<String, Object> request) {
         String operation = requiredString(request, "operation");
         String variable = variableName(request.get("variable"));
-        String expression = requiredExpression(request, "expression");
+        String expression = symbolicExpression(request, "expression");
 
         return switch (operation) {
-            case "simplify", "expand" -> {
-                Polynomial polynomial = parsePolynomial(expression, variable);
-                yield text(polynomial.format(variable), polynomial.format(variable), List.of(
-                    "Parsed the expression as a supported symbolic polynomial.",
-                    "Expanded and combined like powers."
-                ));
-            }
-            case "factor" -> factorResponse(parsePolynomial(expression, variable), variable);
+            case "simplify" -> symbolicText("Simplify", expression, "Simplified expression with Symja.");
+            case "expand" -> symbolicText("Expand", expression, "Expanded expression with Symja.");
+            case "factor" -> factorAlgebra(expression, variable);
             case "substitute" -> {
                 double value = finiteNumber(request.get("subValue"), "Substitution value");
                 double result = ExpressionParser.parse(expression).eval(Map.of(variable, value));
@@ -140,21 +142,26 @@ public class MathEngineService {
                 if (matrixA[0].length != matrixB.length) {
                     throw badRequest("Matrix multiplication requires columns(A) to equal rows(B).");
                 }
-                yield data("Matrix multiplication computed successfully.", toArray(simpleMatrix(matrixA).mult(simpleMatrix(matrixB))), List.of(
-                    "Computed A * B using EJML dense matrix multiplication."
+                RealMatrix product = realMatrix(matrixA).multiply(realMatrix(matrixB));
+                yield data("Matrix multiplication computed successfully.", matrixData(product), List.of(
+                    "Computed A * B using Apache Commons Math dense matrix multiplication."
                 ));
             }
             case "determinant" -> {
                 assertSquare(matrixA, "Matrix A");
-                double determinant = simpleMatrix(matrixA).determinant();
+                double determinant = new LUDecomposition(realMatrix(matrixA)).getDeterminant();
                 yield data("Determinant: det(A) = " + formatNumber(determinant), Map.of("determinant", determinant), List.of(
-                    "Computed determinant using EJML dense matrix routines."
+                    "Computed determinant using Apache Commons Math LU decomposition."
                 ));
             }
             case "inverse" -> {
                 assertSquare(matrixA, "Matrix A");
-                yield data("Inversion matrix generated.", toArray(simpleMatrix(matrixA).invert()), List.of(
-                    "Computed inverse using EJML dense linear algebra."
+                DecompositionSolver solver = new LUDecomposition(realMatrix(matrixA)).getSolver();
+                if (!solver.isNonSingular()) {
+                    throw badRequest("Matrix A must be non-singular for inversion.");
+                }
+                yield data("Inversion matrix generated.", matrixData(solver.getInverse()), List.of(
+                    "Computed inverse using Apache Commons Math LU decomposition."
                 ));
             }
             case "lu" -> {
@@ -189,9 +196,13 @@ public class MathEngineService {
             case "solveLinear" -> {
                 assertSquare(matrixA, "Matrix A");
                 double[] vector = numericVector(request.get("vectorB"), matrixA.length, "Vector b");
-                double[] solution = toVector(simpleMatrix(matrixA).solve(columnVector(vector)));
+                DecompositionSolver solver = new LUDecomposition(realMatrix(matrixA)).getSolver();
+                if (!solver.isNonSingular()) {
+                    throw badRequest("Matrix A must be non-singular to solve Ax = b.");
+                }
+                double[] solution = solver.solve(new ArrayRealVector(vector, false)).toArray();
                 yield data("System solutions: x = " + vectorText(solution), solution, List.of(
-                    "Solved Ax = b using EJML dense linear algebra."
+                    "Solved Ax = b using Apache Commons Math LU decomposition."
                 ));
             }
             default -> throw badRequest("Unsupported matrix operation.");
@@ -306,6 +317,18 @@ public class MathEngineService {
         ));
     }
 
+    private Map<String, Object> factorAlgebra(String expression, String variable) {
+        try {
+            Polynomial polynomial = parsePolynomial(expression, variable);
+            if (polynomial.degree() <= 2) {
+                return factorResponse(polynomial, variable);
+            }
+        } catch (ApiException exception) {
+            // Fall through to Symja for non-polynomial and multivariable expressions.
+        }
+        return symbolicText("Factor", expression, "Factored expression with Symja.");
+    }
+
     private Map<String, Object> rootsResponse(Polynomial polynomial, String variable) {
         List<Double> roots = polynomial.realRoots();
         String output = roots.isEmpty()
@@ -338,6 +361,37 @@ public class MathEngineService {
 
     private static Polynomial parsePolynomial(String expression, String variable) {
         return ExpressionParser.parse(expression).polynomial(variable);
+    }
+
+    private static Map<String, Object> symbolicText(String operation, String expression, String step) {
+        SymjaResult result = symbolicCommand(operation + "[" + expression + "]", step);
+        return text(result.output(), result.output(), result.steps());
+    }
+
+    private static SymjaResult symbolicCommand(String command, String step) {
+        try {
+            ExprEvaluator evaluator = new ExprEvaluator();
+            IExpr result = evaluator.evaluateWithTimeout(command, SYMBOLIC_TIMEOUT_SECONDS, TimeUnit.SECONDS, true, null);
+            String output = result == null ? "" : result.toString();
+            if (output.isBlank()) {
+                throw badRequest("Symbolic computation did not return a result.");
+            }
+            if (output.length() > MAX_SYMBOLIC_OUTPUT_LENGTH) {
+                throw badRequest("Symbolic result is too large.");
+            }
+            if (output.contains("$Aborted") || output.contains("TimeConstrained")) {
+                throw badRequest("Symbolic computation exceeded the configured time limit.");
+            }
+            return new SymjaResult(output, List.of(
+                "Validated expression against MathLab Pro input limits.",
+                step,
+                "Computed symbolic result with Symja."
+            ));
+        } catch (ApiException exception) {
+            throw exception;
+        } catch (RuntimeException exception) {
+            throw badRequest("Symbolic computation failed: " + safeMessage(exception));
+        }
     }
 
     private static String factorPolynomial(Polynomial polynomial, String variable) {
@@ -586,36 +640,6 @@ public class MathEngineService {
         return result;
     }
 
-    private static SimpleMatrix simpleMatrix(double[][] matrix) {
-        return new SimpleMatrix(matrix);
-    }
-
-    private static SimpleMatrix columnVector(double[] vector) {
-        SimpleMatrix matrix = new SimpleMatrix(vector.length, 1);
-        for (int row = 0; row < vector.length; row++) {
-            matrix.set(row, 0, vector[row]);
-        }
-        return matrix;
-    }
-
-    private static double[][] toArray(SimpleMatrix matrix) {
-        double[][] result = new double[matrix.numRows()][matrix.numCols()];
-        for (int row = 0; row < matrix.numRows(); row++) {
-            for (int col = 0; col < matrix.numCols(); col++) {
-                result[row][col] = matrix.get(row, col);
-            }
-        }
-        return result;
-    }
-
-    private static double[] toVector(SimpleMatrix matrix) {
-        double[] result = new double[matrix.numRows()];
-        for (int row = 0; row < matrix.numRows(); row++) {
-            result[row] = matrix.get(row, 0);
-        }
-        return result;
-    }
-
     private static RealMatrix realMatrix(double[][] matrix) {
         return MatrixUtils.createRealMatrix(matrix);
     }
@@ -656,6 +680,14 @@ public class MathEngineService {
         String expression = requiredString(request, field);
         if (expression.length() > MAX_EXPRESSION_LENGTH) {
             throw badRequest("Expression is too long. Maximum length is " + MAX_EXPRESSION_LENGTH + " characters.");
+        }
+        return expression;
+    }
+
+    private static String symbolicExpression(Map<String, Object> request, String field) {
+        String expression = requiredExpression(request, field);
+        if (!SYMBOLIC_PATTERN.matcher(expression).matches()) {
+            throw badRequest("Expression contains unsupported symbolic characters.");
         }
         return expression;
     }
@@ -829,6 +861,12 @@ public class MathEngineService {
         return new ApiException(HttpStatus.BAD_REQUEST, message);
     }
 
+    private static String safeMessage(RuntimeException exception) {
+        String message = exception.getMessage();
+        if (message == null || message.isBlank()) return "invalid symbolic expression";
+        return message.length() <= 160 ? message : message.substring(0, 160);
+    }
+
     private static String formatNumber(double value) {
         if (Math.abs(value) < EPSILON) return "0";
         if (Math.abs(value - Math.rint(value)) < EPSILON) {
@@ -882,6 +920,9 @@ public class MathEngineService {
             result.put("finalY", finalY);
             return result;
         }
+    }
+
+    private record SymjaResult(String output, List<String> steps) {
     }
 
     private interface Expression {

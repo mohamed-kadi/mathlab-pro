@@ -36,12 +36,12 @@ The deterministic backend slice now covers:
 - Numerical limit approximation, Taylor polynomials, and RK4 ODE integration.
 - Descriptive statistics.
 
-The Spring Boot backend uses EJML for dense matrix arithmetic and Apache Commons Math for decomposition, integration, curve fitting, and descriptive statistics.
+The Spring Boot backend uses Apache Commons Math for dense matrix arithmetic, decomposition, integration, curve fitting, and descriptive statistics. Symja is used for bounded symbolic simplification, expansion, and higher-degree factorization.
 
 ## Later Coverage
 
 - Symbolic integration beyond polynomial power-rule cases.
-- Higher-degree factorization and exact algebra through Symja.
+- Broader exact algebra through Symja.
 - Probability distributions and hypothesis testing.
 - Multivariable calculus and partial derivatives.
 - WebSocket-backed long-running calculation jobs with cancellation.

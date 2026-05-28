@@ -24,6 +24,10 @@ management:
       exposure:
         include: health,info,metrics
 
+logging:
+  level:
+    edu.jas: warn
+
 mathlab:
   cache:
     ttl-seconds: ${CALCULATION_CACHE_TTL_SECONDS:900}
