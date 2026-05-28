@@ -1,5 +1,7 @@
 # MathLab Pro
 
+[![CI](https://github.com/mohamed-kadi/mathlab-pro/actions/workflows/ci.yml/badge.svg)](https://github.com/mohamed-kadi/mathlab-pro/actions/workflows/ci.yml)
+
 MathLab Pro is an interactive symbolic and numerical mathematics workspace. The current implementation is a React 19 + TypeScript frontend served by an Express API, with math operations powered primarily by `mathjs` and optional Gemini-assisted tutoring.
 
 This repository is not yet the full Java/Spring Boot/PostgreSQL architecture from the original product prompt. It is the existing working prototype that will be hardened incrementally.
@@ -63,6 +65,10 @@ npm test
 ```
 
 The current test script runs smoke/integration coverage for auth, authorization, project isolation, history persistence, math APIs, and spreadsheet formula safety against an isolated temporary JSON database.
+
+## Continuous Integration
+
+GitHub Actions runs `npm ci`, `npm run lint`, `npm test`, and `npm run build` on every push to `main` and every pull request.
 
 ## Build And Run
 
