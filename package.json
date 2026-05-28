@@ -10,7 +10,8 @@
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
-    "test": "tsx tests/api-smoke.ts"
+    "test": "tsx tests/api-smoke.ts",
+    "db:migrate:json": "tsx scripts/migrate-json-to-postgres.ts"
   },
   "engines": {
     "node": ">=20.19.0",
@@ -30,6 +31,7 @@
     "lucide-react": "^0.546.0",
     "mathjs": "^15.2.0",
     "motion": "^12.23.24",
+    "pg": "^8.21.0",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "vite": "^6.2.3",
@@ -40,6 +42,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/katex": "^0.16.8",
     "@types/node": "^22.14.0",
+    "@types/pg": "^8.20.0",
     "autoprefixer": "^10.4.21",
     "esbuild": "^0.25.0",
     "tailwindcss": "^4.1.14",

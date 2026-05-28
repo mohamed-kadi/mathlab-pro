@@ -68,7 +68,7 @@ The current test script runs smoke/integration coverage for auth, authorization,
 
 ## Continuous Integration
 
-GitHub Actions runs `npm ci`, `npm run lint`, `npm test`, and `npm run build` on every push to `main` and every pull request.
+GitHub Actions runs `npm ci`, `npm run lint`, `npm test`, `npm run build`, and `docker compose config` on every push to `main` and every pull request.
 
 ## Build And Run
 
@@ -85,9 +85,22 @@ Health check:
 curl http://localhost:3000/api/health
 ```
 
+## Docker Compose
+
+```bash
+docker compose up --build
+```
+
+Compose starts the app on `http://localhost:3000` plus PostgreSQL and Redis services for the persistence and caching roadmap. The app still uses the JSON-backed store at `MATHLAB_DB_FILE`; PostgreSQL is initialized with the relational schema and can receive current JSON data through the migration command.
+
 ## Data Storage
 
-The prototype stores data in `data/db.json`, which is generated at runtime and ignored by Git. This is suitable for local demos only. Production persistence should move to PostgreSQL with migrations and ownership-aware queries.
+The prototype stores data in `data/db.json`, which is generated at runtime and ignored by Git. This is suitable for local demos only. PostgreSQL schema and JSON migration tooling are available in [docs/postgres-migration.md](docs/postgres-migration.md).
+
+```bash
+docker compose up -d postgres
+DATABASE_URL="postgres://mathlab:mathlab_dev_password@localhost:5432/mathlab_pro" npm run db:migrate:json
+```
 
 ## Git Workflow
 
@@ -102,8 +115,8 @@ git push -u origin main
 
 1. Stabilize runtime scripts, docs, Node version, build warnings, and smoke checks.
 2. Expand security hardening with CSRF strategy, audit logging, and production secret management.
-3. Move from JSON storage to PostgreSQL migrations and repositories.
+3. Replace JSON `readDb()` / `writeDb()` calls with PostgreSQL repositories.
 4. Add focused unit and API tests for each math module.
 5. Replace placeholder CAS behavior with robust symbolic operations or a dedicated CAS service.
-6. Add Redis caching, rate limiting, audit logging, API docs, and Docker Compose.
+6. Add Redis-backed calculation caching, audit logging, API docs, and deployment automation.
 7. Evaluate whether to keep the Node backend or rebuild the backend in Java 21/Spring Boot to match the original prompt exactly.

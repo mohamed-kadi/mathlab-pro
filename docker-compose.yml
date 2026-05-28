@@ -1,0 +1,71 @@
+services:
+  app:
+    build:
+      context: .
+      target: runtime
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOST: 0.0.0.0
+      JWT_SECRET: ${JWT_SECRET:-replace-with-a-long-random-secret}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      MATHLAB_DB_FILE: /app/data/db.json
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      APP_URL: ${APP_URL:-http://localhost:3000}
+    ports:
+      - "3000:3000"
+    volumes:
+      - app_data:/app/data
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-mathlab_pro}
+      POSTGRES_USER: ${POSTGRES_USER:-mathlab}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mathlab_dev_password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mathlab} -d ${POSTGRES_DB:-mathlab_pro}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  migrate-json:
+    profiles:
+      - tools
+    build:
+      context: .
+      target: build
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-mathlab}:${POSTGRES_PASSWORD:-mathlab_dev_password}@postgres:5432/${POSTGRES_DB:-mathlab_pro}
+      MATHLAB_DB_FILE: /app/data/db.json
+    volumes:
+      - app_data:/app/data:ro
+    command: npm run db:migrate:json
+
+volumes:
+  app_data:
+  postgres_data:
+  redis_data:

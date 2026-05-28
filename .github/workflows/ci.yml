@@ -44,3 +44,6 @@ jobs:
         env:
           NODE_ENV: production
         run: npm run build
+
+      - name: Validate Docker Compose
+        run: docker compose config
