@@ -36,6 +36,22 @@ async function requestJson(pathname: string, init: RequestInit = {}) {
   return { response, body };
 }
 
+function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function waitForAuditLog(headers: Record<string, string>, predicate: (logs: any[]) => boolean) {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const auditLogs = await requestJson('/api/audit-logs', { headers });
+    assert.equal(auditLogs.response.status, 200);
+    if (predicate(auditLogs.body)) {
+      return auditLogs.body;
+    }
+    await sleep(25);
+  }
+  assert.fail('Expected audit log entry was not written.');
+}
+
 async function run() {
   const health = await requestJson('/api/health');
   assert.equal(health.response.status, 200);
@@ -63,6 +79,11 @@ async function run() {
   const me = await requestJson('/api/auth/me', { headers: authHeaders });
   assert.equal(me.response.status, 200);
   assert.equal(me.body.user.email, 'guest@mathlab.edu');
+
+  const cacheStatus = await requestJson('/api/cache/status', { headers: authHeaders });
+  assert.equal(cacheStatus.response.status, 200);
+  assert.equal(cacheStatus.body.provider, 'memory');
+  assert.equal(cacheStatus.body.enabled, true);
 
   const projects = await requestJson('/api/projects', { headers: authHeaders });
   assert.equal(projects.response.status, 200);
@@ -225,10 +246,26 @@ async function run() {
 
   const derivative = await requestJson('/api/math/polynomial', {
     method: 'POST',
+    headers: authHeaders,
     body: JSON.stringify({ expression: 'x^2 + 2*x + 1', operation: 'derivative', variable: 'x' })
   });
   assert.equal(derivative.response.status, 200);
+  assert.equal(derivative.response.headers.get('x-mathlab-cache'), 'MISS');
   assert.match(derivative.body.output, /x \+ 1/);
+
+  const cachedDerivative = await requestJson('/api/math/polynomial', {
+    method: 'POST',
+    headers: authHeaders,
+    body: JSON.stringify({ variable: 'x', operation: 'derivative', expression: 'x^2 + 2*x + 1' })
+  });
+  assert.equal(cachedDerivative.response.status, 200);
+  assert.equal(cachedDerivative.response.headers.get('x-mathlab-cache'), 'HIT');
+  assert.equal(cachedDerivative.body.output, derivative.body.output);
+
+  await waitForAuditLog(authHeaders, logs =>
+    logs.some(log => log.resource === 'saved-expressions' && log.action === 'create') &&
+    logs.some(log => log.resource === 'math.polynomial' && log.action === 'calculate')
+  );
 
   assert.equal(evaluateCellValue({ A1: '2', B1: '3', C1: '=A1+B1*2' }, 'C1'), '8.000');
   assert.equal(evaluateCellValue({ A1: '=process.exit()' }, 'A1'), '#VALUE!');

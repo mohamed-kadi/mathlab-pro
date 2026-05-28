@@ -14,6 +14,7 @@ export interface DatabaseSchema {
   projects: ProjectRecord[];
   graphConfigurations: GraphConfigurationRecord[];
   sharedWorkspaces: SharedWorkspaceRecord[];
+  auditLogs: AuditLogRecord[];
 }
 
 export interface UserRecord {
@@ -84,6 +85,18 @@ export interface SharedWorkspaceRecord {
   sharedWithUsername?: string;
 }
 
+export interface AuditLogRecord {
+  id: string;
+  userId?: string;
+  action: string;
+  resource: string;
+  resourceId?: string;
+  metadata: Record<string, unknown>;
+  ipAddress?: string;
+  userAgent?: string;
+  createdAt: string;
+}
+
 export const defaultDatabase: DatabaseSchema = {
   users: [
     {
@@ -139,7 +152,8 @@ export const defaultDatabase: DatabaseSchema = {
     }
   ],
   graphConfigurations: [],
-  sharedWorkspaces: []
+  sharedWorkspaces: [],
+  auditLogs: []
 };
 
 function ensureDirExists() {

@@ -41,6 +41,7 @@ try {
     await client.query(`
       TRUNCATE
         shared_workspaces,
+        audit_logs,
         graph_configurations,
         calculation_history,
         project_sheets,
@@ -197,6 +198,33 @@ try {
     );
   }
 
+  for (const auditLog of db.auditLogs || []) {
+    await client.query(
+      `
+        INSERT INTO audit_logs (id, user_id, action, resource, resource_id, metadata, ip_address, user_agent, created_at)
+        VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9)
+        ON CONFLICT (id) DO UPDATE SET
+          action = EXCLUDED.action,
+          resource = EXCLUDED.resource,
+          resource_id = EXCLUDED.resource_id,
+          metadata = EXCLUDED.metadata,
+          ip_address = EXCLUDED.ip_address,
+          user_agent = EXCLUDED.user_agent
+      `,
+      [
+        auditLog.id,
+        auditLog.userId || null,
+        auditLog.action,
+        auditLog.resource,
+        auditLog.resourceId || null,
+        JSON.stringify(auditLog.metadata || {}),
+        auditLog.ipAddress || null,
+        auditLog.userAgent || null,
+        timestamp(auditLog.createdAt)
+      ]
+    );
+  }
+
   await client.query('COMMIT');
 
   console.log(`Migrated JSON database into PostgreSQL from ${dbFile}`);
@@ -204,6 +232,7 @@ try {
   console.log(`Saved expressions: ${db.savedExpressions?.length || 0}`);
   console.log(`Projects: ${db.projects?.length || 0}`);
   console.log(`History items: ${db.calculationHistory?.length || 0}`);
+  console.log(`Audit logs: ${db.auditLogs?.length || 0}`);
 } catch (error) {
   await client.query('ROLLBACK');
   throw error;

@@ -11,6 +11,8 @@ import { z } from "zod";
 import crypto from "crypto";
 import type { UserRecord } from "./server/db.js";
 import { createRepository, type MathLabRepository } from "./server/repository.js";
+import { auditMiddleware } from "./server/audit.js";
+import { calculationCacheMiddleware, createCalculationCache } from "./server/cache.js";
 import {
   calculateEigenvaluesAndVectors,
   solveNewtonRaphson,
@@ -163,6 +165,16 @@ function requireAuth(repository: MathLabRepository) {
   };
 }
 
+function optionalAuth(repository: MathLabRepository) {
+  return async (req: AuthenticatedRequest, _res: Response, next: NextFunction) => {
+    const user = await userFromToken(req, repository);
+    if (user) {
+      req.authUser = user;
+    }
+    return next();
+  };
+}
+
 function validationError(res: Response, error: z.ZodError) {
   return res.status(400).json({
     error: "Invalid request body.",
@@ -194,6 +206,7 @@ async function verifyPassword(user: UserRecord, password: string, repository: Ma
 export async function createApp() {
   const app = express();
   const repository = createRepository();
+  const calculationCache = createCalculationCache();
   const authRequired = requireAuth(repository);
 
   // Middleware
@@ -220,6 +233,9 @@ export async function createApp() {
     res.setHeader("X-Frame-Options", "DENY");
     next();
   });
+  app.use("/api", auditMiddleware(repository));
+  app.use("/api/math", optionalAuth(repository));
+  app.use("/api/math", calculationCacheMiddleware(calculationCache));
 
   app.get("/api/health", (_req, res) => {
     return res.json({
@@ -252,6 +268,7 @@ export async function createApp() {
     };
 
     await repository.createUser(newUser);
+    res.locals.auditUserId = newUser.id;
 
     return res.json({ token: signToken(newUser), user: safeUser(newUser) });
   });
@@ -273,11 +290,21 @@ export async function createApp() {
       return res.status(401).json({ error: "Invalid email or credentials" });
     }
 
+    res.locals.auditUserId = user.id;
     return res.json({ token: signToken(user), user: safeUser(user) });
   });
 
   app.get("/api/auth/me", authRequired, (req: AuthenticatedRequest, res) => {
     return res.json({ user: req.authUser });
+  });
+
+  app.get("/api/audit-logs", authRequired, async (req: AuthenticatedRequest, res) => {
+    const limit = Math.min(Math.max(Number(req.query.limit || 100), 1), 250);
+    return res.json(await repository.listAuditLogsByUser(req.authUser!.id, limit));
+  });
+
+  app.get("/api/cache/status", authRequired, (_req, res) => {
+    return res.json(calculationCache.status());
   });
 
   // --- Saved Expressions API ---

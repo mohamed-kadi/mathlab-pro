@@ -3,6 +3,7 @@ import path from 'node:path';
 import { Pool, type PoolClient } from 'pg';
 import { readDb, writeDb, cloneDefaultDatabase } from './db.js';
 import type {
+  AuditLogRecord,
   CalculationHistoryRecord,
   GraphConfigurationRecord,
   ProjectRecord,
@@ -37,6 +38,8 @@ export interface MathLabRepository {
   upsertSharedWorkspace(share: SharedWorkspaceRecord): Promise<SharedWorkspaceRecord>;
   updateSharedWorkspaceRole(ownerUserId: string, shareId: string, role: SharedWorkspaceRecord['role']): Promise<SharedWorkspaceRecord | null>;
   deleteSharedWorkspace(ownerUserId: string, shareId: string): Promise<boolean>;
+  listAuditLogsByUser(userId: string, limit?: number): Promise<AuditLogRecord[]>;
+  createAuditLog(auditLog: AuditLogRecord): Promise<AuditLogRecord>;
 }
 
 class JsonRepository implements MathLabRepository {
@@ -298,6 +301,27 @@ class JsonRepository implements MathLabRepository {
     writeDb(db);
     return true;
   }
+
+  async listAuditLogsByUser(userId: string, limit = 100) {
+    this.ensureSeeded();
+    return readDb()
+      .auditLogs
+      .filter(auditLog => auditLog.userId === userId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, limit);
+  }
+
+  async createAuditLog(auditLog: AuditLogRecord) {
+    const db = readDb();
+    db.auditLogs.push(auditLog);
+    if (db.auditLogs.length > 2_000) {
+      db.auditLogs = db.auditLogs
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        .slice(0, 2_000);
+    }
+    writeDb(db);
+    return auditLog;
+  }
 }
 
 class PostgresRepository implements MathLabRepository {
@@ -364,6 +388,20 @@ class PostgresRepository implements MathLabRepository {
       ownerUsername: row.owner_username || undefined,
       sharedWithEmail: row.shared_with_email || undefined,
       sharedWithUsername: row.shared_with_username || undefined
+    };
+  }
+
+  private mapAuditLog(row: any): AuditLogRecord {
+    return {
+      id: row.id,
+      userId: row.user_id || undefined,
+      action: row.action,
+      resource: row.resource,
+      resourceId: row.resource_id || undefined,
+      metadata: row.metadata || {},
+      ipAddress: row.ip_address || undefined,
+      userAgent: row.user_agent || undefined,
+      createdAt: new Date(row.created_at).toISOString()
     };
   }
 
@@ -804,6 +842,43 @@ class PostgresRepository implements MathLabRepository {
     await this.ensureSchema();
     const result = await this.pool.query('DELETE FROM shared_workspaces WHERE id = $1 AND owner_user_id = $2', [shareId, ownerUserId]);
     return (result.rowCount || 0) > 0;
+  }
+
+  async listAuditLogsByUser(userId: string, limit = 100) {
+    await this.ensureSchema();
+    const result = await this.pool.query(
+      `
+        SELECT id, user_id, action, resource, resource_id, metadata, ip_address, user_agent, created_at
+        FROM audit_logs
+        WHERE user_id = $1
+        ORDER BY created_at DESC
+        LIMIT $2
+      `,
+      [userId, limit]
+    );
+    return result.rows.map(row => this.mapAuditLog(row));
+  }
+
+  async createAuditLog(auditLog: AuditLogRecord) {
+    await this.ensureSchema();
+    await this.pool.query(
+      `
+        INSERT INTO audit_logs (id, user_id, action, resource, resource_id, metadata, ip_address, user_agent, created_at)
+        VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9)
+      `,
+      [
+        auditLog.id,
+        auditLog.userId || null,
+        auditLog.action,
+        auditLog.resource,
+        auditLog.resourceId || null,
+        JSON.stringify(auditLog.metadata || {}),
+        auditLog.ipAddress || null,
+        auditLog.userAgent || null,
+        auditLog.createdAt
+      ]
+    );
+    return auditLog;
   }
 
   private async replaceSheets(client: PoolClient, project: ProjectRecord) {

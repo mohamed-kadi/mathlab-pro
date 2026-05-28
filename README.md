@@ -16,6 +16,8 @@ This repository is not yet the full Java/Spring Boot/PostgreSQL architecture fro
 - Statistics: descriptive statistics and confidence interval calculation.
 - Workspace persistence: saved expressions, projects, graph configurations, shared workspaces, and spreadsheet-style cells.
 - Graphing: canvas-based 2D plotting with pan/zoom and traced coordinates.
+- Calculation caching: repeated math API calls use an in-process cache locally or Redis when `REDIS_URL` is configured.
+- Audit logging: successful auth, workspace, and authenticated calculation actions are recorded for the current user.
 - AI tutoring: Gemini-backed explanations when `GEMINI_API_KEY` is configured, with offline fallback text otherwise.
 
 ## Requirements
@@ -44,6 +46,8 @@ Useful variables:
 - `HOST`: bind host, defaults to `0.0.0.0`
 - `JWT_SECRET`: long random secret used to sign access tokens
 - `JWT_EXPIRES_IN`: token lifetime, defaults to `7d`
+- `REDIS_URL`: optional Redis endpoint for calculation caching
+- `CALCULATION_CACHE_TTL_SECONDS`: cache lifetime for repeated calculation responses, defaults to `900`
 - `GEMINI_API_KEY`: optional key for AI tutoring
 - `APP_URL`: deployed application URL
 
@@ -104,7 +108,7 @@ DATABASE_URL="postgres://mathlab:mathlab_dev_password@localhost:5432/mathlab_pro
 
 ## Workspace APIs
 
-Authenticated workspace resources are available under `/api/saved-expressions`, `/api/projects`, `/api/graph-configurations`, and `/api/shared-workspaces`. Use `Authorization: Bearer <token>` from `/api/auth/login` or `/api/auth/register`.
+Authenticated workspace resources are available under `/api/saved-expressions`, `/api/projects`, `/api/graph-configurations`, and `/api/shared-workspaces`. Use `Authorization: Bearer <token>` from `/api/auth/login` or `/api/auth/register`. Operational endpoints for authenticated users are available at `/api/audit-logs` and `/api/cache/status`.
 
 ## Git Workflow
 
@@ -121,6 +125,6 @@ git push -u origin main
 2. Expand security hardening with CSRF strategy, audit logging, and production secret management.
 3. Add focused unit and API tests for each math module.
 4. Replace placeholder CAS behavior with robust symbolic operations or a dedicated CAS service.
-5. Add Redis-backed calculation caching, audit logging, API docs, and deployment automation.
-6. Add frontend panels for saved expressions, graph libraries, and workspace sharing.
+5. Add OpenAPI documentation and deployment automation.
+6. Add frontend panels for saved expressions, graph libraries, audit history, and workspace sharing.
 7. Evaluate whether to keep the Node backend or rebuild the backend in Java 21/Spring Boot to match the original prompt exactly.

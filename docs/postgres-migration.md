@@ -49,14 +49,14 @@ DATABASE_URL="postgres://mathlab:mathlab_dev_password@postgres:5432/mathlab_pro"
 ## Schema Notes
 
 - `users` stores account identity and password hashes.
-- `saved_expressions`, `projects`, `project_sheets`, `calculation_history`, `graph_configurations`, and `shared_workspaces` model the original prompt's persistence requirements.
+- `saved_expressions`, `projects`, `project_sheets`, `calculation_history`, `graph_configurations`, `shared_workspaces`, and `audit_logs` model the original prompt's persistence requirements.
 - Project sheets store cells as `JSONB` for now because spreadsheet shape is still fluid.
 - IDs remain text to preserve existing JSON IDs during migration.
 
 ## Current Runtime Coverage
 
-The repository layer and REST API support users, saved expressions, projects, project sheets, calculation history, graph configurations, and shared workspaces for both JSON and PostgreSQL.
+The repository layer and REST API support users, saved expressions, projects, project sheets, calculation history, graph configurations, shared workspaces, and audit logs for both JSON and PostgreSQL.
 
 ## Next Backend Step
 
-Add Redis-backed calculation caching, audit logging, and focused math-module tests.
+Add OpenAPI documentation, deployment automation, and focused math-module tests.
