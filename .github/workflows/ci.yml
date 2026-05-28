@@ -56,5 +56,8 @@ jobs:
         working-directory: backend
         run: mvn test
 
+      - name: Test Spring API contract
+        run: npm run test:contract:spring
+
       - name: Validate Docker Compose
         run: docker compose --profile tools config

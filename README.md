@@ -98,7 +98,7 @@ MATHLAB_API_BASE_URL=http://localhost:8080 npm run test:contract
 
 ## Continuous Integration
 
-GitHub Actions runs `npm ci`, `npm run lint`, `npm test`, `npm run build`, and `docker compose --profile tools config` on every push to `main` and every pull request.
+GitHub Actions runs `npm ci`, `npm run lint`, `npm test`, `npm run build`, Spring backend tests, the Spring API contract target, and `docker compose --profile tools config` on every push to `main` and every pull request.
 
 ## Backend Direction
 

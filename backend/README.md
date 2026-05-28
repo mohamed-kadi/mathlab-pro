@@ -56,3 +56,9 @@ The root contract remains `../docs/openapi.yaml`. To run the portable contract s
 ```bash
 MATHLAB_API_BASE_URL=http://localhost:8080 npm run test:contract
 ```
+
+To start an isolated H2-backed Spring contract target and run the contract suite automatically from the repository root:
+
+```bash
+npm run test:contract:spring
+```

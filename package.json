@@ -14,6 +14,7 @@
     "test:unit": "tsx tests/spreadsheet-formula.test.ts",
     "test:math": "tsx tests/math-engine-golden.test.ts",
     "test:contract": "tsx tests/api-contract.ts",
+    "test:contract:spring": "bash scripts/test-spring-contract.sh",
     "db:migrate:json": "tsx scripts/migrate-json-to-postgres.ts"
   },
   "engines": {
