@@ -33,7 +33,7 @@ import {
   computeStatistics,
   fitCurve
 } from "./server/mathEngine.js";
-import { generateMathExplanation } from "./server/gemini.js";
+import { generateMathExplanation } from "./server/aiTutor.js";
 import { create, all } from 'mathjs';
 
 const math = create(all);
@@ -1081,7 +1081,7 @@ export async function createApp() {
     }
   });
 
-  // 7. Gemini AI Mathematics Interactive Solver
+  // 7. AI mathematics interactive solver
   app.post("/api/math/ai-explain", async (req, res) => {
     const { query, category } = req.body;
     if (!query) {

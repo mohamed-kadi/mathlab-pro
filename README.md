@@ -2,14 +2,15 @@
 
 [![CI](https://github.com/mohamed-kadi/mathlab-pro/actions/workflows/ci.yml/badge.svg)](https://github.com/mohamed-kadi/mathlab-pro/actions/workflows/ci.yml)
 
-MathLab Pro is an interactive symbolic and numerical mathematics workspace. The current implementation is a React 19 + TypeScript frontend served by an Express API, with math operations powered primarily by `mathjs` and optional Gemini-assisted tutoring.
+MathLab Pro is a usable full-stack symbolic and numerical mathematics workspace today. The default runtime is a React 19 + TypeScript frontend served by the current TypeScript API, with math operations powered primarily by `mathjs` and optional AI-assisted tutoring.
 
-The production backend target is Java 21 + Spring Boot. The current Node/Express backend remains the working prototype and reference implementation while the Java backend is migrated against the OpenAPI contract.
+Production readiness is still in progress. The Spring Boot backend in [backend](backend/README.md) is the production backend target and is being built to match the OpenAPI contract before it replaces the current API runtime.
 
 Architecture direction and API contract:
 
 - [Architecture Decision](docs/architecture-decision.md)
 - [OpenAPI Contract](docs/openapi.yaml)
+- [Production Readiness Checklist](docs/production-readiness.md)
 
 ## Current Capabilities
 
@@ -24,13 +25,13 @@ Architecture direction and API contract:
 - Calculation caching: repeated math API calls use an in-process cache locally or Redis when `REDIS_URL` is configured.
 - Audit logging: successful auth, workspace, and authenticated calculation actions are recorded for the current user.
 - Math safety: expression length, parse complexity, allowed symbols/functions, finite numeric inputs, and matrix dimensions are validated server-side.
-- AI tutoring: Gemini-backed explanations when `GEMINI_API_KEY` is configured, with offline fallback text otherwise.
+- AI tutoring: provider-backed explanations when `AI_PROVIDER_API_KEY` is configured, with offline fallback text otherwise.
 
 ## Requirements
 
 - Node.js `>=20.19.0`
 - npm `>=10.0.0`
-- Java 21 and Maven 3.9+ for the Spring Boot backend scaffold in `backend-java/`
+- Java 21 and Maven 3.9+ for the Spring Boot backend in `backend/`
 
 Use the pinned local version with:
 
@@ -40,7 +41,7 @@ nvm use
 
 ## Environment
 
-Create a local env file from the example:
+Create a local env file for the current TypeScript API from the example:
 
 ```bash
 cp .env.example .env.local
@@ -55,8 +56,18 @@ Useful variables:
 - `JWT_EXPIRES_IN`: token lifetime, defaults to `7d`
 - `REDIS_URL`: optional Redis endpoint for calculation caching
 - `CALCULATION_CACHE_TTL_SECONDS`: cache lifetime for repeated calculation responses, defaults to `900`
-- `GEMINI_API_KEY`: optional key for AI tutoring
+- `AI_PROVIDER_BASE_URL`: optional OpenAI-compatible chat completions endpoint for AI tutoring
+- `AI_PROVIDER_API_KEY`: optional key for AI tutoring
+- `AI_PROVIDER_MODEL`: optional model name for AI tutoring
 - `APP_URL`: deployed application URL
+
+The Spring Boot backend has its own example file:
+
+```bash
+cp backend/.env.example backend/.env
+```
+
+Use `backend/.env.example` as the source for shell, Docker, or deployment variables. Maven does not automatically load `backend/.env` unless your shell or runtime environment exports those values.
 
 The seeded local demo account is `guest@mathlab.edu` with password `mathlab-demo-password`.
 
@@ -75,9 +86,9 @@ The dev server runs the Express API and Vite middleware together.
 npm test
 ```
 
-The default test script runs spreadsheet formula unit coverage plus portable API contract coverage for auth, authorization, project isolation, history persistence, math APIs, cache behavior, audit logging, and AI explanation fallbacks. Without extra configuration, contract tests start the current Node backend against an isolated temporary JSON database.
+The default test script runs spreadsheet formula unit coverage plus portable API contract coverage for auth, authorization, project isolation, history persistence, math APIs, cache behavior, audit logging, and AI explanation fallbacks. Without extra configuration, contract tests start the current TypeScript API against an isolated temporary JSON database.
 
-To run the same API contract suite against another backend, such as the future Java/Spring Boot service:
+To run the same API contract suite against another backend, such as the Spring Boot service:
 
 ```bash
 MATHLAB_API_BASE_URL=http://localhost:8080 npm run test:contract
@@ -87,14 +98,14 @@ MATHLAB_API_BASE_URL=http://localhost:8080 npm run test:contract
 
 GitHub Actions runs `npm ci`, `npm run lint`, `npm test`, `npm run build`, and `docker compose --profile tools config` on every push to `main` and every pull request.
 
-## Backend Migration Direction
+## Backend Direction
 
-MathLab Pro is moving contract-first toward a Java 21/Spring Boot production backend. The React frontend and API behavior should stay stable while the Java backend is built endpoint by endpoint. New backend work should use [docs/openapi.yaml](docs/openapi.yaml) as the source contract.
+MathLab Pro is moving contract-first toward a Java 21/Spring Boot production backend. The React frontend and API behavior should stay stable while the backend is built endpoint by endpoint. New backend work should use [docs/openapi.yaml](docs/openapi.yaml) as the source contract.
 
-The first Java backend scaffold is available under [backend-java](backend-java/README.md). It currently includes Spring Security JWT auth, PostgreSQL/Flyway schema, Redis cache configuration, health/cache endpoints, OpenAPI UI wiring, and MockMvc tests. Run it independently with:
+The Spring Boot backend is available under [backend](backend/README.md). It currently includes Spring Security JWT auth, PostgreSQL/Flyway schema, Redis cache configuration, health/cache endpoints, OpenAPI UI wiring, and MockMvc tests. Run it independently with:
 
 ```bash
-cd backend-java
+cd backend
 mvn test
 mvn spring-boot:run
 ```
@@ -124,7 +135,7 @@ Compose starts the app on `http://localhost:3000` plus PostgreSQL and Redis serv
 
 ## Data Storage
 
-The prototype stores data in `data/db.json`, which is generated at runtime and ignored by Git. This remains the local fallback. When `DATABASE_URL` is set, the server uses PostgreSQL repositories instead. PostgreSQL schema and JSON migration tooling are available in [docs/postgres-migration.md](docs/postgres-migration.md).
+The current TypeScript API stores local data in `data/db.json`, which is generated at runtime and ignored by Git. This remains the local fallback for development. When `DATABASE_URL` is set, the server uses PostgreSQL repositories instead. PostgreSQL schema and JSON migration tooling are available in [docs/postgres-migration.md](docs/postgres-migration.md).
 
 ```bash
 docker compose up -d postgres
@@ -148,8 +159,8 @@ git push -u origin main
 
 1. Stabilize runtime scripts, docs, Node version, build warnings, and smoke checks.
 2. Expand security hardening with CSRF strategy, audit logging, and production secret management.
-3. Maintain portable API contract tests that can run against Node or Java.
-4. Continue hardening the Java 21/Spring Boot backend under `backend-java/`.
+3. Maintain portable API contract tests that can run against either backend.
+4. Continue hardening the Java 21/Spring Boot backend under `backend/`.
 5. Port remaining APIs incrementally against the OpenAPI contract.
 6. Add richer frontend editing for saved graph viewport presets and shared workspace permissions.
-7. Retire the Node backend after Java reaches contract parity.
+7. Switch the default runtime to Spring Boot after backend contract parity.

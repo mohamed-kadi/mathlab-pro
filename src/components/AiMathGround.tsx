@@ -40,7 +40,7 @@ export default function AiMathGround({ onAddGraphEquation, token }: AiMathGround
 
       const data = await resp.json();
       if (!resp.ok) {
-        throw new Error(data.error || "Failed to contact Gemini CAS engine");
+        throw new Error(data.error || "Failed to contact the AI math service");
       }
 
       setResponse({
@@ -69,7 +69,7 @@ export default function AiMathGround({ onAddGraphEquation, token }: AiMathGround
         <div className="flex items-center space-x-2 border-b border-zinc-800 pb-3">
           <Sparkles className="w-4 h-4 text-purple-400" />
           <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider font-mono">
-            MathLab Pro AI-Assisted Symbolic Tutor (Gemini 3.5-Flash)
+            MathLab Pro AI-Assisted Symbolic Tutor
           </span>
         </div>
 

@@ -28,7 +28,7 @@ mathlab:
   cache:
     ttl-seconds: ${CALCULATION_CACHE_TTL_SECONDS:900}
   cors:
-    allowed-origins: ${APP_URL:http://localhost:3000,http://localhost:5173}
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
   jwt:
     secret: ${JWT_SECRET:mathlab-pro-local-dev-secret-change-me-at-least-32-chars}
     expires-in: ${JWT_EXPIRES_IN:7d}

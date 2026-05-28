@@ -16,7 +16,7 @@ const redactedKeys = new Set([
   'jwtsecret',
   'secret',
   'apikey',
-  'gemini_api_key'
+  'ai_provider_api_key'
 ]);
 
 export function auditMiddleware(repository: MathLabRepository) {

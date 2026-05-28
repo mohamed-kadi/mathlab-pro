@@ -3,11 +3,11 @@ info:
   title: MathLab Pro API
   version: 0.1.0
   description: >
-    Contract-first API for MathLab Pro. The current Node/Express prototype and
-    the planned Java 21/Spring Boot backend must satisfy this contract.
+    Contract-first API for MathLab Pro. The current TypeScript API and the
+    Java 21/Spring Boot backend must satisfy this contract.
 servers:
   - url: http://localhost:3000
-    description: Local prototype server
+    description: Current local API server
 security:
   - bearerAuth: []
 tags:

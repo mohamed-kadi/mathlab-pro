@@ -1,6 +1,6 @@
 # PostgreSQL Migration Path
 
-MathLab Pro can run against a JSON database file for local prototype speed or PostgreSQL when `DATABASE_URL` is configured. This directory documents the PostgreSQL schema and JSON import utility.
+MathLab Pro can run against a JSON database file for local development speed or PostgreSQL when `DATABASE_URL` is configured. This directory documents the PostgreSQL schema and JSON import utility.
 
 ## Start PostgreSQL
 
@@ -59,4 +59,4 @@ The repository layer and REST API support users, saved expressions, projects, pr
 
 ## Next Backend Step
 
-Add OpenAPI documentation, deployment automation, and focused math-module tests.
+Keep the Spring Boot backend schema aligned with these migrations, then add contract coverage for the remaining workspace and math endpoints.

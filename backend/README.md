@@ -1,6 +1,6 @@
-# MathLab Pro Java Backend
+# MathLab Pro Backend
 
-This is the production backend scaffold for MathLab Pro. It runs alongside the current Node/Express prototype until it reaches OpenAPI contract parity.
+This is the Spring Boot production backend for MathLab Pro. It runs alongside the current TypeScript API until it reaches OpenAPI contract parity.
 
 ## Stack
 
@@ -15,6 +15,14 @@ This is the production backend scaffold for MathLab Pro. It runs alongside the c
 - JUnit/MockMvc tests
 
 ## Local Commands
+
+Copy the environment template if you want a local reference file:
+
+```bash
+cp .env.example .env
+```
+
+Maven does not automatically load `.env`; export those values in your shell or provide them through your runtime environment when needed.
 
 ```bash
 mvn test
