@@ -19,6 +19,7 @@ ENV HOST=0.0.0.0
 COPY package*.json ./
 RUN npm ci --omit=dev
 COPY --from=build /app/dist ./dist
+COPY --from=build /app/database ./database
 
 EXPOSE 3000
 CMD ["npm", "start"]

@@ -46,4 +46,4 @@ jobs:
         run: npm run build
 
       - name: Validate Docker Compose
-        run: docker compose config
+        run: docker compose --profile tools config

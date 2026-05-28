@@ -91,11 +91,11 @@ curl http://localhost:3000/api/health
 docker compose up --build
 ```
 
-Compose starts the app on `http://localhost:3000` plus PostgreSQL and Redis services for the persistence and caching roadmap. The app still uses the JSON-backed store at `MATHLAB_DB_FILE`; PostgreSQL is initialized with the relational schema and can receive current JSON data through the migration command.
+Compose starts the app on `http://localhost:3000` plus PostgreSQL and Redis services for the persistence and caching roadmap. By default, the app container uses the JSON-backed store at `MATHLAB_DB_FILE` so the demo account works immediately. Set `DATABASE_URL` to switch the runtime repository layer to PostgreSQL.
 
 ## Data Storage
 
-The prototype stores data in `data/db.json`, which is generated at runtime and ignored by Git. This is suitable for local demos only. PostgreSQL schema and JSON migration tooling are available in [docs/postgres-migration.md](docs/postgres-migration.md).
+The prototype stores data in `data/db.json`, which is generated at runtime and ignored by Git. This remains the local fallback. When `DATABASE_URL` is set, the server uses PostgreSQL repositories instead. PostgreSQL schema and JSON migration tooling are available in [docs/postgres-migration.md](docs/postgres-migration.md).
 
 ```bash
 docker compose up -d postgres
@@ -115,7 +115,7 @@ git push -u origin main
 
 1. Stabilize runtime scripts, docs, Node version, build warnings, and smoke checks.
 2. Expand security hardening with CSRF strategy, audit logging, and production secret management.
-3. Replace JSON `readDb()` / `writeDb()` calls with PostgreSQL repositories.
+3. Broaden PostgreSQL coverage for saved expressions, graph configurations, and shared workspace APIs.
 4. Add focused unit and API tests for each math module.
 5. Replace placeholder CAS behavior with robust symbolic operations or a dedicated CAS service.
 6. Add Redis-backed calculation caching, audit logging, API docs, and deployment automation.

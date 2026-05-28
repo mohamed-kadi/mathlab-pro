@@ -1,6 +1,6 @@
 # PostgreSQL Migration Path
 
-MathLab Pro currently runs against a JSON database file for local prototype speed. This directory adds the PostgreSQL schema and migration utility that will be used when the runtime repository layer is switched to PostgreSQL.
+MathLab Pro can run against a JSON database file for local prototype speed or PostgreSQL when `DATABASE_URL` is configured. This directory documents the PostgreSQL schema and JSON import utility.
 
 ## Start PostgreSQL
 
@@ -32,6 +32,20 @@ Set `MIGRATION_TRUNCATE=true` to clear existing rows before importing:
 MIGRATION_TRUNCATE=true npm run db:migrate:json
 ```
 
+## Run The App Against PostgreSQL
+
+After importing data, set `DATABASE_URL` for the server:
+
+```bash
+DATABASE_URL="postgres://mathlab:mathlab_dev_password@localhost:5432/mathlab_pro" npm run dev
+```
+
+With Docker Compose, add `DATABASE_URL` to the `app` service environment or provide it through an `.env` file:
+
+```bash
+DATABASE_URL="postgres://mathlab:mathlab_dev_password@postgres:5432/mathlab_pro" docker compose up --build
+```
+
 ## Schema Notes
 
 - `users` stores account identity and password hashes.
@@ -39,6 +53,10 @@ MIGRATION_TRUNCATE=true npm run db:migrate:json
 - Project sheets store cells as `JSONB` for now because spreadsheet shape is still fluid.
 - IDs remain text to preserve existing JSON IDs during migration.
 
+## Current Runtime Coverage
+
+The repository layer supports users, projects, project sheets, and calculation history for both JSON and PostgreSQL. Saved expressions, graph configurations, and shared workspaces have schema support and migration support, but do not yet have public API routes.
+
 ## Next Backend Step
 
-Replace direct `readDb()` / `writeDb()` usage with a repository interface and add a PostgreSQL implementation behind `DATABASE_URL`. Keep the JSON implementation as a local fallback until the PostgreSQL path has equivalent API coverage.
+Add API routes and tests for saved expressions, graph configurations, and shared workspace sharing, then expand PostgreSQL-backed coverage for those workflows.

@@ -60,7 +60,7 @@ export interface ProjectRecord {
   updatedAt: string;
 }
 
-const defaultDatabase: DatabaseSchema = {
+export const defaultDatabase: DatabaseSchema = {
   users: [
     {
       id: "admin",
@@ -148,4 +148,8 @@ export function writeDb(db: DatabaseSchema) {
   } catch (error) {
     console.error("Failed to write to database file:", error);
   }
+}
+
+export function cloneDefaultDatabase(): DatabaseSchema {
+  return JSON.parse(JSON.stringify(defaultDatabase));
 }
