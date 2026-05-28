@@ -10,6 +10,7 @@ Architecture direction and API contract:
 
 - [Architecture Decision](docs/architecture-decision.md)
 - [OpenAPI Contract](docs/openapi.yaml)
+- [Math Engine Specification](docs/math-engine-spec.md)
 - [Production Readiness Checklist](docs/production-readiness.md)
 
 ## Current Capabilities
@@ -86,7 +87,7 @@ The dev server runs the Express API and Vite middleware together.
 npm test
 ```
 
-The default test script runs spreadsheet formula unit coverage plus portable API contract coverage for auth, authorization, project isolation, history persistence, math APIs, cache behavior, audit logging, and AI explanation fallbacks. Without extra configuration, contract tests start the current TypeScript API against an isolated temporary JSON database.
+The default test script runs spreadsheet formula unit coverage, deterministic math-engine golden cases, and portable API contract coverage for auth, authorization, project isolation, history persistence, math APIs, cache behavior, audit logging, and AI explanation fallbacks. Without extra configuration, contract tests start the current TypeScript API against an isolated temporary JSON database.
 
 To run the same API contract suite against another backend, such as the Spring Boot service:
 

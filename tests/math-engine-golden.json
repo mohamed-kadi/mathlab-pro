@@ -1,0 +1,147 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "polynomial.derivative.quadratic",
+      "endpoint": "/api/math/polynomial",
+      "request": {
+        "operation": "derivative",
+        "expression": "x^2 + 2*x + 1",
+        "variable": "x"
+      },
+      "expected": {
+        "status": 200,
+        "outputIncludes": ["2", "x"],
+        "stepsMin": 2
+      }
+    },
+    {
+      "id": "polynomial.integrate.power-rule",
+      "endpoint": "/api/math/polynomial",
+      "request": {
+        "operation": "integrate",
+        "expression": "3*x^2 + 2*x + 1",
+        "variable": "x"
+      },
+      "expected": {
+        "status": 200,
+        "outputIncludes": ["x^3", "x^2", "C"],
+        "stepsMin": 2
+      }
+    },
+    {
+      "id": "polynomial.divide.exact",
+      "endpoint": "/api/math/polynomial",
+      "request": {
+        "operation": "divide",
+        "expression": "x^2 - 1",
+        "operand2": "x - 1",
+        "variable": "x"
+      },
+      "expected": {
+        "status": 200,
+        "outputIncludes": ["Quotient", "x + 1", "Remainder"],
+        "stepsMin": 2
+      }
+    },
+    {
+      "id": "algebra.factor.quadratic",
+      "endpoint": "/api/math/algebra",
+      "request": {
+        "operation": "factor",
+        "expression": "x^2 + 4*x - 12",
+        "variable": "x"
+      },
+      "expected": {
+        "status": 200,
+        "outputIncludes": ["x - 2", "x + 6"],
+        "stepsMin": 2
+      }
+    },
+    {
+      "id": "matrix.determinant.2x2",
+      "endpoint": "/api/math/matrix",
+      "request": {
+        "operation": "determinant",
+        "matrixA": [[1, 2], [3, 4]]
+      },
+      "expected": {
+        "status": 200,
+        "outputIncludes": ["Determinant"],
+        "numeric": [
+          { "path": "result.determinant", "value": -2, "tolerance": 0.000000001 }
+        ],
+        "stepsMin": 1
+      }
+    },
+    {
+      "id": "matrix.multiply.2x2",
+      "endpoint": "/api/math/matrix",
+      "request": {
+        "operation": "multiply",
+        "matrixA": [[1, 2], [3, 4]],
+        "matrixB": [[5, 6], [7, 8]]
+      },
+      "expected": {
+        "status": 200,
+        "numeric": [
+          { "path": "result.0.0", "value": 19, "tolerance": 0.000000001 },
+          { "path": "result.1.1", "value": 50, "tolerance": 0.000000001 }
+        ],
+        "stepsMin": 1
+      }
+    },
+    {
+      "id": "numerical.integrate.simpson",
+      "endpoint": "/api/math/numerical",
+      "request": {
+        "method": "integrate",
+        "expression": "x^2",
+        "a": 0,
+        "b": 1
+      },
+      "expected": {
+        "status": 200,
+        "outputIncludes": ["Numerical Area"],
+        "numeric": [
+          { "path": "result.area", "value": 0.3333333333, "tolerance": 0.000001 }
+        ],
+        "stepsMin": 2
+      }
+    },
+    {
+      "id": "calculus.limit.sin-over-x",
+      "endpoint": "/api/math/calculus",
+      "request": {
+        "operation": "limit",
+        "expression": "sin(x)/x",
+        "center": 0
+      },
+      "expected": {
+        "status": 200,
+        "outputIncludes": ["Limit"],
+        "numeric": [
+          { "path": "result.limit", "value": 1, "tolerance": 0.001 }
+        ],
+        "stepsMin": 2
+      }
+    },
+    {
+      "id": "statistics.summary.basic",
+      "endpoint": "/api/math/statistics",
+      "request": {
+        "series": [1, 2, 3, 4, 5]
+      },
+      "expected": {
+        "status": 200,
+        "outputIncludes": ["Mean"],
+        "numeric": [
+          { "path": "result.mean", "value": 3, "tolerance": 0.000000001 },
+          { "path": "result.median", "value": 3, "tolerance": 0.000000001 },
+          { "path": "result.stdDev", "value": 1.5811388301, "tolerance": 0.000001 }
+        ],
+        "stepsMin": 2
+      }
+    }
+  ]
+}

@@ -10,8 +10,9 @@
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
-    "test": "npm run test:unit && npm run test:contract",
+    "test": "npm run test:unit && npm run test:math && npm run test:contract",
     "test:unit": "tsx tests/spreadsheet-formula.test.ts",
+    "test:math": "tsx tests/math-engine-golden.test.ts",
     "test:contract": "tsx tests/api-contract.ts",
     "db:migrate:json": "tsx scripts/migrate-json-to-postgres.ts"
   },
