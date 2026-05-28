@@ -1,0 +1,1219 @@
+openapi: 3.1.0
+info:
+  title: MathLab Pro API
+  version: 0.1.0
+  description: >
+    Contract-first API for MathLab Pro. The current Node/Express prototype and
+    the planned Java 21/Spring Boot backend must satisfy this contract.
+servers:
+  - url: http://localhost:3000
+    description: Local prototype server
+security:
+  - bearerAuth: []
+tags:
+  - name: Health
+  - name: Auth
+  - name: Workspace
+  - name: Operations
+  - name: History
+  - name: Math
+
+paths:
+  /api/health:
+    get:
+      tags: [Health]
+      security: []
+      summary: Check API health
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /api/auth/register:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Register a user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "200":
+          description: User registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Log in with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Authenticated session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/auth/me:
+    get:
+      tags: [Auth]
+      summary: Return the current authenticated user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [user]
+                properties:
+                  user:
+                    $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/cache/status:
+    get:
+      tags: [Operations]
+      summary: Return calculation cache status
+      responses:
+        "200":
+          description: Cache status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CacheStatus"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/audit-logs:
+    get:
+      tags: [Operations]
+      summary: List audit logs for the current user
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 250
+            default: 100
+      responses:
+        "200":
+          description: Audit log entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AuditLog"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/saved-expressions:
+    get:
+      tags: [Workspace]
+      summary: List saved expressions for the current user
+      responses:
+        "200":
+          description: Saved expressions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SavedExpression"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [Workspace]
+      summary: Create a saved expression
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SavedExpressionRequest"
+      responses:
+        "200":
+          description: Saved expression created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SavedExpression"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/saved-expressions/{id}:
+    put:
+      tags: [Workspace]
+      summary: Update a saved expression
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SavedExpressionUpdateRequest"
+      responses:
+        "200":
+          description: Saved expression updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SavedExpression"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Workspace]
+      summary: Delete a saved expression
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/projects:
+    get:
+      tags: [Workspace]
+      summary: List projects for the current user
+      responses:
+        "200":
+          description: Projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Project"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [Workspace]
+      summary: Create a project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectRequest"
+      responses:
+        "200":
+          description: Project created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/projects/{id}:
+    put:
+      tags: [Workspace]
+      summary: Update a project
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectRequest"
+      responses:
+        "200":
+          description: Project updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Workspace]
+      summary: Delete a project
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/graph-configurations:
+    get:
+      tags: [Workspace]
+      summary: List graph configurations
+      responses:
+        "200":
+          description: Graph configurations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GraphConfiguration"
+    post:
+      tags: [Workspace]
+      summary: Create a graph configuration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GraphConfigurationRequest"
+      responses:
+        "200":
+          description: Graph configuration created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GraphConfiguration"
+
+  /api/graph-configurations/{id}:
+    put:
+      tags: [Workspace]
+      summary: Update a graph configuration
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GraphConfigurationUpdateRequest"
+      responses:
+        "200":
+          description: Graph configuration updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GraphConfiguration"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Workspace]
+      summary: Delete a graph configuration
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/shared-workspaces:
+    get:
+      tags: [Workspace]
+      summary: List incoming and outgoing shared workspaces
+      responses:
+        "200":
+          description: Shared workspace collections
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [outgoing, incoming]
+                properties:
+                  outgoing:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SharedWorkspace"
+                  incoming:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SharedWorkspace"
+    post:
+      tags: [Workspace]
+      summary: Share a project with another user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ShareWorkspaceRequest"
+      responses:
+        "200":
+          description: Shared workspace created or updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SharedWorkspace"
+
+  /api/shared-workspaces/outgoing:
+    get:
+      tags: [Workspace]
+      summary: List workspace shares owned by the current user
+      responses:
+        "200":
+          description: Outgoing shares
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SharedWorkspace"
+
+  /api/shared-workspaces/incoming:
+    get:
+      tags: [Workspace]
+      summary: List workspaces shared with the current user
+      responses:
+        "200":
+          description: Incoming shares
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SharedWorkspace"
+
+  /api/shared-workspaces/{id}:
+    put:
+      tags: [Workspace]
+      summary: Update a shared workspace role
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role:
+                  $ref: "#/components/schemas/WorkspaceRole"
+      responses:
+        "200":
+          description: Share updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SharedWorkspace"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      tags: [Workspace]
+      summary: Delete a shared workspace grant
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/history:
+    get:
+      tags: [History]
+      security:
+        - bearerAuth: []
+        - {}
+      summary: List calculation history for the authenticated user
+      responses:
+        "200":
+          description: History entries or an empty list for anonymous users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CalculationHistory"
+    post:
+      tags: [History]
+      security:
+        - bearerAuth: []
+        - {}
+      summary: Create a calculation history entry for authenticated users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CalculationHistoryRequest"
+      responses:
+        "200":
+          description: History entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CalculationHistory"
+
+  /api/math/polynomial:
+    post:
+      tags: [Math]
+      security:
+        - bearerAuth: []
+        - {}
+      summary: Run a polynomial operation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PolynomialRequest"
+      responses:
+        "200":
+          description: Polynomial result
+          headers:
+            X-MathLab-Cache:
+              $ref: "#/components/headers/CacheHeader"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MathTextResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/math/algebra:
+    post:
+      tags: [Math]
+      security:
+        - bearerAuth: []
+        - {}
+      summary: Run a symbolic algebra operation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AlgebraRequest"
+      responses:
+        "200":
+          description: Algebra result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MathTextResponse"
+
+  /api/math/matrix:
+    post:
+      tags: [Math]
+      security:
+        - bearerAuth: []
+        - {}
+      summary: Run a matrix operation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MatrixRequest"
+      responses:
+        "200":
+          description: Matrix result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MathDataResponse"
+
+  /api/math/numerical:
+    post:
+      tags: [Math]
+      security:
+        - bearerAuth: []
+        - {}
+      summary: Run a numerical method
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NumericalRequest"
+      responses:
+        "200":
+          description: Numerical result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MathDataResponse"
+
+  /api/math/calculus:
+    post:
+      tags: [Math]
+      security:
+        - bearerAuth: []
+        - {}
+      summary: Run a calculus operation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CalculusRequest"
+      responses:
+        "200":
+          description: Calculus result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MathDataResponse"
+
+  /api/math/statistics:
+    post:
+      tags: [Math]
+      security:
+        - bearerAuth: []
+        - {}
+      summary: Compute descriptive statistics
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [series]
+              properties:
+                series:
+                  type: array
+                  minItems: 1
+                  maxItems: 10000
+                  items:
+                    type: number
+      responses:
+        "200":
+          description: Statistics result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MathDataResponse"
+
+  /api/math/ai-explain:
+    post:
+      tags: [Math]
+      security:
+        - bearerAuth: []
+        - {}
+      summary: Generate an AI-assisted math explanation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query:
+                  type: string
+                  maxLength: 4000
+                category:
+                  type: string
+      responses:
+        "200":
+          description: AI explanation result
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  headers:
+    CacheHeader:
+      description: Calculation cache status for the response.
+      schema:
+        type: string
+        enum: [HIT, MISS]
+
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: Authentication failed or missing
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Success:
+      description: Successful command
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [success]
+            properties:
+              success:
+                type: boolean
+                const: true
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+        details:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+
+    HealthResponse:
+      type: object
+      required: [status, service, timestamp]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        service:
+          type: string
+          enum: [mathlab-pro]
+        timestamp:
+          type: string
+          format: date-time
+
+    User:
+      type: object
+      required: [id, username, email, createdAt]
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        createdAt:
+          type: string
+          format: date-time
+
+    RegisterRequest:
+      type: object
+      required: [username, email, password]
+      properties:
+        username:
+          type: string
+          minLength: 2
+          maxLength: 40
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        password:
+          type: string
+          minLength: 8
+          maxLength: 128
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        password:
+          type: string
+          minLength: 1
+          maxLength: 128
+
+    AuthResponse:
+      type: object
+      required: [token, user]
+      properties:
+        token:
+          type: string
+        user:
+          $ref: "#/components/schemas/User"
+
+    CacheStatus:
+      type: object
+      required: [provider, enabled, ttlSeconds]
+      properties:
+        provider:
+          type: string
+          enum: [memory, redis]
+        enabled:
+          type: boolean
+        ttlSeconds:
+          type: integer
+        redisUrl:
+          type: string
+
+    AuditLog:
+      type: object
+      required: [id, action, resource, metadata, createdAt]
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        action:
+          type: string
+        resource:
+          type: string
+        resourceId:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+        ipAddress:
+          type: string
+        userAgent:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    SavedExpression:
+      type: object
+      required: [id, userId, name, rawExpression, latexExpression, createdAt]
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        name:
+          type: string
+        rawExpression:
+          type: string
+        latexExpression:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    SavedExpressionRequest:
+      type: object
+      required: [name, rawExpression]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        rawExpression:
+          type: string
+          minLength: 1
+          maxLength: 4000
+        latexExpression:
+          type: string
+          maxLength: 8000
+
+    SavedExpressionUpdateRequest:
+      type: object
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        rawExpression:
+          type: string
+          minLength: 1
+          maxLength: 4000
+        latexExpression:
+          type: string
+          maxLength: 8000
+
+    Project:
+      type: object
+      required: [id, userId, name, description, sheets, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        sheets:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectSheet"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ProjectRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        description:
+          type: string
+          maxLength: 1000
+        sheets:
+          type: array
+          maxItems: 20
+          items:
+            $ref: "#/components/schemas/ProjectSheet"
+
+    ProjectSheet:
+      type: object
+      required: [id, name, cells]
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 80
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        cells:
+          type: object
+          additionalProperties:
+            type: string
+            maxLength: 500
+
+    GraphConfiguration:
+      type: object
+      required: [id, userId, name, config, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        projectId:
+          type: string
+        name:
+          type: string
+        config:
+          type: object
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    GraphConfigurationRequest:
+      type: object
+      properties:
+        projectId:
+          type: string
+          maxLength: 80
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        config:
+          type: object
+          additionalProperties: true
+
+    GraphConfigurationUpdateRequest:
+      allOf:
+        - $ref: "#/components/schemas/GraphConfigurationRequest"
+      minProperties: 1
+
+    WorkspaceRole:
+      type: string
+      enum: [viewer, editor]
+
+    SharedWorkspace:
+      type: object
+      required: [id, projectId, ownerUserId, sharedWithUserId, role, createdAt]
+      properties:
+        id:
+          type: string
+        projectId:
+          type: string
+        ownerUserId:
+          type: string
+        sharedWithUserId:
+          type: string
+        role:
+          $ref: "#/components/schemas/WorkspaceRole"
+        createdAt:
+          type: string
+          format: date-time
+        projectName:
+          type: string
+        ownerEmail:
+          type: string
+          format: email
+        ownerUsername:
+          type: string
+        sharedWithEmail:
+          type: string
+          format: email
+        sharedWithUsername:
+          type: string
+
+    ShareWorkspaceRequest:
+      type: object
+      required: [projectId, sharedWithEmail]
+      properties:
+        projectId:
+          type: string
+          minLength: 1
+          maxLength: 80
+        sharedWithEmail:
+          type: string
+          format: email
+          maxLength: 254
+        role:
+          $ref: "#/components/schemas/WorkspaceRole"
+
+    CalculationHistory:
+      type: object
+      required: [id, type, input, output, createdAt]
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        type:
+          $ref: "#/components/schemas/CalculationType"
+        input:
+          type: string
+        output:
+          type: string
+        latexInput:
+          type: string
+        latexOutput:
+          type: string
+        steps:
+          type: array
+          items:
+            type: string
+        explanation:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    CalculationHistoryRequest:
+      type: object
+      required: [type, input, output]
+      properties:
+        type:
+          $ref: "#/components/schemas/CalculationType"
+        input:
+          type: string
+          maxLength: 4000
+        output:
+          type: string
+          maxLength: 8000
+        latexInput:
+          type: string
+          maxLength: 8000
+        latexOutput:
+          type: string
+          maxLength: 8000
+        steps:
+          type: array
+          maxItems: 200
+          items:
+            type: string
+            maxLength: 4000
+        explanation:
+          type: string
+          maxLength: 10000
+
+    CalculationType:
+      type: string
+      enum: [polynomial, algebra, matrix, numerical, statistics, calculus, ai-explain]
+
+    PolynomialRequest:
+      type: object
+      required: [expression, operation]
+      properties:
+        expression:
+          type: string
+          minLength: 1
+          maxLength: 1000
+        operation:
+          type: string
+          enum: [simplify, derivative, integrate, divide, multiply, factor, roots]
+        operand2:
+          type: string
+          maxLength: 1000
+        variable:
+          type: string
+          default: x
+
+    AlgebraRequest:
+      type: object
+      required: [expression, operation]
+      properties:
+        expression:
+          type: string
+          minLength: 1
+          maxLength: 1000
+        operation:
+          type: string
+          enum: [simplify, expand, factor, substitute]
+        variable:
+          type: string
+          default: x
+        subValue:
+          type: number
+
+    MatrixRequest:
+      type: object
+      required: [matrixA, operation]
+      properties:
+        matrixA:
+          $ref: "#/components/schemas/NumberMatrix"
+        matrixB:
+          $ref: "#/components/schemas/NumberMatrix"
+        vectorB:
+          type: array
+          items:
+            type: number
+        operation:
+          type: string
+          enum: [add, multiply, determinant, inverse, lu, qr, eigen, solveLinear]
+
+    NumberMatrix:
+      type: array
+      minItems: 1
+      maxItems: 10
+      items:
+        type: array
+        minItems: 1
+        maxItems: 10
+        items:
+          type: number
+
+    NumericalRequest:
+      type: object
+      required: [method]
+      properties:
+        expression:
+          type: string
+          maxLength: 1000
+        method:
+          type: string
+          enum: [newton, bisection, integrate, curvefit]
+        initialGuess:
+          type: number
+        a:
+          type: number
+        b:
+          type: number
+        degree:
+          type: integer
+          minimum: 1
+          maximum: 6
+        points:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            required: [x, y]
+            properties:
+              x:
+                type: number
+              y:
+                type: number
+
+    CalculusRequest:
+      type: object
+      required: [operation]
+      properties:
+        expression:
+          type: string
+          maxLength: 1000
+        operation:
+          type: string
+          enum: [limit, taylor, ode]
+        center:
+          type: number
+        degree:
+          type: integer
+          minimum: 0
+          maximum: 12
+        x0:
+          type: number
+        y0:
+          type: number
+        xEnd:
+          type: number
+        stepsCount:
+          type: integer
+          minimum: 1
+          maximum: 5000
+
+    MathTextResponse:
+      type: object
+      required: [output, steps]
+      properties:
+        output:
+          type: string
+        latexOutput:
+          type: string
+        steps:
+          type: array
+          items:
+            type: string
+
+    MathDataResponse:
+      type: object
+      required: [output, steps]
+      properties:
+        output:
+          type: string
+        latexOutput:
+          type: string
+        latexResult:
+          type: string
+        steps:
+          type: array
+          items:
+            type: string
+        result:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: array
+              items: {}

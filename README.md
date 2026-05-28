@@ -4,7 +4,12 @@
 
 MathLab Pro is an interactive symbolic and numerical mathematics workspace. The current implementation is a React 19 + TypeScript frontend served by an Express API, with math operations powered primarily by `mathjs` and optional Gemini-assisted tutoring.
 
-This repository is not yet the full Java/Spring Boot/PostgreSQL architecture from the original product prompt. It is the existing working prototype that will be hardened incrementally.
+The production backend target is Java 21 + Spring Boot. The current Node/Express backend remains the working prototype and reference implementation while the Java backend is migrated against the OpenAPI contract.
+
+Architecture direction and API contract:
+
+- [Architecture Decision](docs/architecture-decision.md)
+- [OpenAPI Contract](docs/openapi.yaml)
 
 ## Current Capabilities
 
@@ -75,6 +80,10 @@ The current test script runs smoke/integration coverage for auth, authorization,
 
 GitHub Actions runs `npm ci`, `npm run lint`, `npm test`, `npm run build`, and `docker compose --profile tools config` on every push to `main` and every pull request.
 
+## Backend Migration Direction
+
+MathLab Pro is moving contract-first toward a Java 21/Spring Boot production backend. The React frontend and API behavior should stay stable while the Java backend is built endpoint by endpoint. New backend work should use [docs/openapi.yaml](docs/openapi.yaml) as the source contract.
+
 ## Build And Run
 
 ```bash
@@ -124,8 +133,8 @@ git push -u origin main
 
 1. Stabilize runtime scripts, docs, Node version, build warnings, and smoke checks.
 2. Expand security hardening with CSRF strategy, audit logging, and production secret management.
-3. Add focused unit tests for each math module beyond the API smoke suite.
-4. Expand CAS coverage beyond quadratic univariate polynomials or add a dedicated CAS service.
-5. Add OpenAPI documentation and deployment automation.
+3. Add portable API contract tests that can run against Node or Java.
+4. Scaffold the Java 21/Spring Boot backend under `backend-java/`.
+5. Port APIs incrementally against the OpenAPI contract.
 6. Add richer frontend editing for saved graph viewport presets and shared workspace permissions.
-7. Evaluate whether to keep the Node backend or rebuild the backend in Java 21/Spring Boot to match the original prompt exactly.
+7. Retire the Node backend after Java reaches contract parity.
