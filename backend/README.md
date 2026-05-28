@@ -32,15 +32,23 @@ mvn spring-boot:run
 
 The default runtime profile expects PostgreSQL. Tests use H2 with JPA schema generation so they do not require local infrastructure.
 
-## Implemented First
+## Implemented
 
 - `GET /api/health`
 - `POST /api/auth/register`
 - `POST /api/auth/login`
 - `GET /api/auth/me`
 - `GET /api/cache/status`
+- `GET|POST /api/history`
+- `/api/saved-expressions`
+- `/api/projects`
+- `/api/graph-configurations`
+- `/api/shared-workspaces`
+- `GET /api/audit-logs`
+- `/api/math/polynomial`, `/api/math/algebra`, `/api/math/matrix`, `/api/math/numerical`, `/api/math/calculus`, and `/api/math/statistics`
 - Global validation/error responses
 - JWT issuance and resource server verification
+- Authenticated math audit logging
 
 The root contract remains `../docs/openapi.yaml`. The portable contract test suite in the repository root can target this backend once enough endpoints have been ported:
 

@@ -52,12 +52,21 @@ public class SecurityConfig {
             )
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.GET, "/api/health").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/history").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/history").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/math/**").permitAll()
                 .requestMatchers("/api/auth/register", "/api/auth/login").permitAll()
                 .requestMatchers("/actuator/health", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .anyRequest().authenticated()
             )
-            .oauth2ResourceServer(oauth -> oauth.jwt(Customizer.withDefaults()));
+            .oauth2ResourceServer(oauth -> oauth
+                .jwt(Customizer.withDefaults())
+                .authenticationEntryPoint((request, response, exception) -> {
+                    response.setStatus(401);
+                    response.setContentType("application/json");
+                    response.getWriter().write("{\"error\":\"Authentication required.\"}");
+                })
+            );
 
         return http.build();
     }

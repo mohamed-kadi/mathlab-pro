@@ -9,12 +9,12 @@ MathLab Pro is useful today for local development, demos, and feature validation
 - PostgreSQL repositories and JSON migration tooling exist for the current API.
 - Docker Compose starts the app, PostgreSQL, and Redis.
 - CI runs lint, unit tests, contract tests, build, Docker Compose validation, and Spring backend tests.
-- The Spring Boot backend has JWT auth, PostgreSQL/Flyway, Redis configuration, health/cache endpoints, OpenAPI UI wiring, and MockMvc tests.
+- The Spring Boot backend has JWT auth, PostgreSQL/Flyway, Redis configuration, health/cache endpoints, workspace/history/graph/share/audit endpoints, OpenAPI UI wiring, and MockMvc tests.
 - Deterministic math-engine golden cases cover the current API and the Spring backend library-backed math slice.
 
 ## Required Before Production
 
-- Port all workspace, history, graph, audit, and advanced math endpoints into `backend/`.
+- Complete remaining Spring Boot parity for cache response headers, AI explanation fallback, and advanced math gaps.
 - Run the portable API contract suite against the Spring Boot backend in CI.
 - Switch the default application runtime to Spring Boot only after contract parity.
 - Add production Docker image and Compose/Kubernetes deployment path for the Spring Boot backend.
@@ -31,8 +31,8 @@ MathLab Pro is useful today for local development, demos, and feature validation
 
 ## Near-Term Phase Plan
 
-1. Complete Spring Boot endpoint parity for auth, workspace, history, graph, audit, and cache APIs.
-2. Port math modules with Symja, Apache Commons Math, and EJML behind service-layer boundaries.
-3. Run contract tests against both runtimes, then make Spring Boot the default backend.
+1. Complete Spring Boot endpoint parity for cache headers, AI explanations, and any contract gaps.
+2. Expand math modules with Symja-backed symbolic algebra while keeping Apache Commons Math and EJML behind service-layer boundaries.
+3. Run portable contract tests against both runtimes in CI, then make Spring Boot the default backend.
 4. Harden production deployment with secrets, Nginx/TLS, observability, backups, and rate limiting.
 5. Add browser smoke tests and load tests before any public launch.

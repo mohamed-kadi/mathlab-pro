@@ -434,7 +434,7 @@ paths:
       security:
         - bearerAuth: []
         - {}
-      summary: List calculation history for the authenticated user
+      summary: List calculation history for the authenticated user or return an empty anonymous list
       responses:
         "200":
           description: History entries or an empty list for anonymous users
@@ -449,7 +449,7 @@ paths:
       security:
         - bearerAuth: []
         - {}
-      summary: Create a calculation history entry for authenticated users
+      summary: Create a calculation history entry
       requestBody:
         required: true
         content:
