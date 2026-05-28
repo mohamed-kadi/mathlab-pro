@@ -32,7 +32,7 @@ The current Node backend is useful because it already proves the frontend workfl
 
 1. Maintain the current Node backend as the runnable prototype.
 2. Treat `docs/openapi.yaml` as the backend contract.
-3. Add portable API contract tests that can run against either backend.
+3. Use portable API contract tests that can run against either backend.
 4. Scaffold `backend-java/` with Spring Boot, Maven, security, health, OpenAPI, PostgreSQL, Redis, and test foundations.
 5. Port endpoints incrementally in this order:
    - Health and authentication.

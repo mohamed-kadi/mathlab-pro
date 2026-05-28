@@ -74,7 +74,13 @@ The dev server runs the Express API and Vite middleware together.
 npm test
 ```
 
-The current test script runs smoke/integration coverage for auth, authorization, project isolation, history persistence, math APIs, and spreadsheet formula safety against an isolated temporary JSON database.
+The default test script runs spreadsheet formula unit coverage plus portable API contract coverage for auth, authorization, project isolation, history persistence, math APIs, cache behavior, audit logging, and AI explanation fallbacks. Without extra configuration, contract tests start the current Node backend against an isolated temporary JSON database.
+
+To run the same API contract suite against another backend, such as the future Java/Spring Boot service:
+
+```bash
+MATHLAB_API_BASE_URL=http://localhost:8080 npm run test:contract
+```
 
 ## Continuous Integration
 
@@ -133,7 +139,7 @@ git push -u origin main
 
 1. Stabilize runtime scripts, docs, Node version, build warnings, and smoke checks.
 2. Expand security hardening with CSRF strategy, audit logging, and production secret management.
-3. Add portable API contract tests that can run against Node or Java.
+3. Maintain portable API contract tests that can run against Node or Java.
 4. Scaffold the Java 21/Spring Boot backend under `backend-java/`.
 5. Port APIs incrementally against the OpenAPI contract.
 6. Add richer frontend editing for saved graph viewport presets and shared workspace permissions.
