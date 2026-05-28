@@ -73,6 +73,38 @@ const historySchema = z.object({
   explanation: z.string().max(10000).optional()
 });
 
+const savedExpressionSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  rawExpression: z.string().trim().min(1).max(4000),
+  latexExpression: z.string().trim().max(8000).optional()
+});
+
+const savedExpressionUpdateSchema = savedExpressionSchema.partial().refine(
+  value => Object.keys(value).length > 0,
+  { message: "At least one saved expression field is required." }
+);
+
+const graphConfigurationSchema = z.object({
+  projectId: z.string().trim().min(1).max(80).optional(),
+  name: z.string().trim().min(1).max(120).optional(),
+  config: z.record(z.string(), z.unknown()).optional()
+});
+
+const graphConfigurationUpdateSchema = graphConfigurationSchema.partial().refine(
+  value => Object.keys(value).length > 0,
+  { message: "At least one graph configuration field is required." }
+);
+
+const shareWorkspaceSchema = z.object({
+  projectId: z.string().trim().min(1).max(80),
+  sharedWithEmail: z.string().trim().email().max(254),
+  role: z.enum(["viewer", "editor"]).default("viewer")
+});
+
+const shareRoleSchema = z.object({
+  role: z.enum(["viewer", "editor"])
+});
+
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }
@@ -248,6 +280,49 @@ export async function createApp() {
     return res.json({ user: req.authUser });
   });
 
+  // --- Saved Expressions API ---
+
+  app.get("/api/saved-expressions", authRequired, async (req: AuthenticatedRequest, res) => {
+    return res.json(await repository.listSavedExpressionsByUser(req.authUser!.id));
+  });
+
+  app.post("/api/saved-expressions", authRequired, async (req: AuthenticatedRequest, res) => {
+    const parsed = savedExpressionSchema.safeParse(req.body);
+    if (!parsed.success) return validationError(res, parsed.error);
+
+    const { name, rawExpression, latexExpression } = parsed.data;
+    const savedExpression = {
+      id: "exp-" + crypto.randomUUID(),
+      userId: req.authUser!.id,
+      name,
+      rawExpression,
+      latexExpression: latexExpression || rawExpression,
+      createdAt: new Date().toISOString()
+    };
+
+    return res.json(await repository.createSavedExpression(savedExpression));
+  });
+
+  app.put("/api/saved-expressions/:id", authRequired, async (req: AuthenticatedRequest, res) => {
+    const parsed = savedExpressionUpdateSchema.safeParse(req.body);
+    if (!parsed.success) return validationError(res, parsed.error);
+
+    const updatedExpression = await repository.updateSavedExpression(req.authUser!.id, req.params.id, parsed.data);
+    if (!updatedExpression) {
+      return res.status(404).json({ error: "Saved expression not found" });
+    }
+
+    return res.json(updatedExpression);
+  });
+
+  app.delete("/api/saved-expressions/:id", authRequired, async (req: AuthenticatedRequest, res) => {
+    const deleted = await repository.deleteSavedExpression(req.authUser!.id, req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ error: "Saved expression not found" });
+    }
+    return res.json({ success: true });
+  });
+
   // --- Projects Workspace API ---
 
   app.get("/api/projects", authRequired, async (req: AuthenticatedRequest, res) => {
@@ -300,6 +375,136 @@ export async function createApp() {
     const deleted = await repository.deleteProject(req.authUser!.id, id);
     if (!deleted) {
       return res.status(404).json({ error: "Project not found" });
+    }
+    return res.json({ success: true });
+  });
+
+  // --- Graph Configurations API ---
+
+  app.get("/api/graph-configurations", authRequired, async (req: AuthenticatedRequest, res) => {
+    return res.json(await repository.listGraphConfigurationsByUser(req.authUser!.id));
+  });
+
+  app.post("/api/graph-configurations", authRequired, async (req: AuthenticatedRequest, res) => {
+    const parsed = graphConfigurationSchema.safeParse(req.body);
+    if (!parsed.success) return validationError(res, parsed.error);
+
+    const userId = req.authUser!.id;
+    const { projectId, name, config } = parsed.data;
+    if (projectId && !(await repository.findProjectByUser(userId, projectId))) {
+      return res.status(404).json({ error: "Project not found" });
+    }
+
+    const now = new Date().toISOString();
+    const graphConfiguration = {
+      id: "graph-" + crypto.randomUUID(),
+      userId,
+      ...(projectId ? { projectId } : {}),
+      name: name || "Untitled Graph",
+      config: config || {},
+      createdAt: now,
+      updatedAt: now
+    };
+
+    return res.json(await repository.createGraphConfiguration(graphConfiguration));
+  });
+
+  app.put("/api/graph-configurations/:id", authRequired, async (req: AuthenticatedRequest, res) => {
+    const parsed = graphConfigurationUpdateSchema.safeParse(req.body);
+    if (!parsed.success) return validationError(res, parsed.error);
+
+    const userId = req.authUser!.id;
+    if (parsed.data.projectId && !(await repository.findProjectByUser(userId, parsed.data.projectId))) {
+      return res.status(404).json({ error: "Project not found" });
+    }
+
+    const updatedGraph = await repository.updateGraphConfiguration(userId, req.params.id, {
+      ...parsed.data,
+      updatedAt: new Date().toISOString()
+    });
+    if (!updatedGraph) {
+      return res.status(404).json({ error: "Graph configuration not found" });
+    }
+
+    return res.json(updatedGraph);
+  });
+
+  app.delete("/api/graph-configurations/:id", authRequired, async (req: AuthenticatedRequest, res) => {
+    const deleted = await repository.deleteGraphConfiguration(req.authUser!.id, req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ error: "Graph configuration not found" });
+    }
+    return res.json({ success: true });
+  });
+
+  // --- Shared Workspaces API ---
+
+  app.get("/api/shared-workspaces", authRequired, async (req: AuthenticatedRequest, res) => {
+    const userId = req.authUser!.id;
+    const [outgoing, incoming] = await Promise.all([
+      repository.listSharedWorkspacesForOwner(userId),
+      repository.listSharedWorkspacesForRecipient(userId)
+    ]);
+    return res.json({ outgoing, incoming });
+  });
+
+  app.get("/api/shared-workspaces/outgoing", authRequired, async (req: AuthenticatedRequest, res) => {
+    return res.json(await repository.listSharedWorkspacesForOwner(req.authUser!.id));
+  });
+
+  app.get("/api/shared-workspaces/incoming", authRequired, async (req: AuthenticatedRequest, res) => {
+    return res.json(await repository.listSharedWorkspacesForRecipient(req.authUser!.id));
+  });
+
+  app.post("/api/shared-workspaces", authRequired, async (req: AuthenticatedRequest, res) => {
+    const parsed = shareWorkspaceSchema.safeParse(req.body);
+    if (!parsed.success) return validationError(res, parsed.error);
+
+    const ownerUserId = req.authUser!.id;
+    const { projectId, role } = parsed.data;
+    const sharedWithEmail = normalizeEmail(parsed.data.sharedWithEmail);
+
+    if (!(await repository.findProjectByUser(ownerUserId, projectId))) {
+      return res.status(404).json({ error: "Project not found" });
+    }
+
+    const recipient = await repository.findUserByEmail(sharedWithEmail);
+    if (!recipient) {
+      return res.status(404).json({ error: "Recipient user not found" });
+    }
+
+    if (recipient.id === ownerUserId) {
+      return res.status(400).json({ error: "You cannot share a workspace with yourself." });
+    }
+
+    const share = {
+      id: "share-" + crypto.randomUUID(),
+      projectId,
+      ownerUserId,
+      sharedWithUserId: recipient.id,
+      role,
+      createdAt: new Date().toISOString()
+    };
+
+    return res.json(await repository.upsertSharedWorkspace(share));
+  });
+
+  app.put("/api/shared-workspaces/:id", authRequired, async (req: AuthenticatedRequest, res) => {
+    const parsed = shareRoleSchema.safeParse(req.body);
+    if (!parsed.success) return validationError(res, parsed.error);
+
+    const updatedShare = await repository.updateSharedWorkspaceRole(req.authUser!.id, req.params.id, parsed.data.role);
+    if (!updatedShare) {
+      return res.status(404).json({ error: "Shared workspace not found" });
+    }
+
+    return res.json(updatedShare);
+  });
+
+  app.delete("/api/shared-workspaces/:id", authRequired, async (req: AuthenticatedRequest, res) => {
+    const deleted = await repository.deleteSharedWorkspace(req.authUser!.id, req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ error: "Shared workspace not found" });
     }
     return res.json({ success: true });
   });

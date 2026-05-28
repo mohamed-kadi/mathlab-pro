@@ -55,8 +55,8 @@ DATABASE_URL="postgres://mathlab:mathlab_dev_password@postgres:5432/mathlab_pro"
 
 ## Current Runtime Coverage
 
-The repository layer supports users, projects, project sheets, and calculation history for both JSON and PostgreSQL. Saved expressions, graph configurations, and shared workspaces have schema support and migration support, but do not yet have public API routes.
+The repository layer and REST API support users, saved expressions, projects, project sheets, calculation history, graph configurations, and shared workspaces for both JSON and PostgreSQL.
 
 ## Next Backend Step
 
-Add API routes and tests for saved expressions, graph configurations, and shared workspace sharing, then expand PostgreSQL-backed coverage for those workflows.
+Add Redis-backed calculation caching, audit logging, and focused math-module tests.

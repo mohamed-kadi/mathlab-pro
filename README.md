@@ -14,7 +14,7 @@ This repository is not yet the full Java/Spring Boot/PostgreSQL architecture fro
 - Numerical methods: Newton-Raphson, bisection, Simpson integration, and polynomial curve fitting.
 - Calculus tools: numerical limits, Taylor series, and RK4 ODE integration.
 - Statistics: descriptive statistics and confidence interval calculation.
-- Workspace projects: local JSON-backed projects and spreadsheet-style cells.
+- Workspace persistence: saved expressions, projects, graph configurations, shared workspaces, and spreadsheet-style cells.
 - Graphing: canvas-based 2D plotting with pan/zoom and traced coordinates.
 - AI tutoring: Gemini-backed explanations when `GEMINI_API_KEY` is configured, with offline fallback text otherwise.
 
@@ -68,7 +68,7 @@ The current test script runs smoke/integration coverage for auth, authorization,
 
 ## Continuous Integration
 
-GitHub Actions runs `npm ci`, `npm run lint`, `npm test`, `npm run build`, and `docker compose config` on every push to `main` and every pull request.
+GitHub Actions runs `npm ci`, `npm run lint`, `npm test`, `npm run build`, and `docker compose --profile tools config` on every push to `main` and every pull request.
 
 ## Build And Run
 
@@ -102,6 +102,10 @@ docker compose up -d postgres
 DATABASE_URL="postgres://mathlab:mathlab_dev_password@localhost:5432/mathlab_pro" npm run db:migrate:json
 ```
 
+## Workspace APIs
+
+Authenticated workspace resources are available under `/api/saved-expressions`, `/api/projects`, `/api/graph-configurations`, and `/api/shared-workspaces`. Use `Authorization: Bearer <token>` from `/api/auth/login` or `/api/auth/register`.
+
 ## Git Workflow
 
 After the initial repository setup, add your remote and push:
@@ -115,8 +119,8 @@ git push -u origin main
 
 1. Stabilize runtime scripts, docs, Node version, build warnings, and smoke checks.
 2. Expand security hardening with CSRF strategy, audit logging, and production secret management.
-3. Broaden PostgreSQL coverage for saved expressions, graph configurations, and shared workspace APIs.
-4. Add focused unit and API tests for each math module.
-5. Replace placeholder CAS behavior with robust symbolic operations or a dedicated CAS service.
-6. Add Redis-backed calculation caching, audit logging, API docs, and deployment automation.
+3. Add focused unit and API tests for each math module.
+4. Replace placeholder CAS behavior with robust symbolic operations or a dedicated CAS service.
+5. Add Redis-backed calculation caching, audit logging, API docs, and deployment automation.
+6. Add frontend panels for saved expressions, graph libraries, and workspace sharing.
 7. Evaluate whether to keep the Node backend or rebuild the backend in Java 21/Spring Boot to match the original prompt exactly.

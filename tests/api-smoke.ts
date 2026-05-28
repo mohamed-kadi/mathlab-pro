@@ -68,6 +68,32 @@ async function run() {
   assert.equal(projects.response.status, 200);
   assert.equal(Array.isArray(projects.body), true);
   assert.equal(projects.body.length, 1);
+  const adminProjectId = projects.body[0].id;
+
+  const savedExpressions = await requestJson('/api/saved-expressions', { headers: authHeaders });
+  assert.equal(savedExpressions.response.status, 200);
+  assert.equal(Array.isArray(savedExpressions.body), true);
+  assert.equal(savedExpressions.body.length, 1);
+
+  const createdExpression = await requestJson('/api/saved-expressions', {
+    method: 'POST',
+    headers: authHeaders,
+    body: JSON.stringify({
+      name: 'Quadratic',
+      rawExpression: 'x^2 + 2*x + 1',
+      latexExpression: 'x^2 + 2x + 1'
+    })
+  });
+  assert.equal(createdExpression.response.status, 200);
+  assert.equal(createdExpression.body.userId, 'admin');
+
+  const updatedExpression = await requestJson(`/api/saved-expressions/${createdExpression.body.id}`, {
+    method: 'PUT',
+    headers: authHeaders,
+    body: JSON.stringify({ name: 'Updated Quadratic' })
+  });
+  assert.equal(updatedExpression.response.status, 200);
+  assert.equal(updatedExpression.body.name, 'Updated Quadratic');
 
   const register = await requestJson('/api/auth/register', {
     method: 'POST',
@@ -84,6 +110,12 @@ async function run() {
   assert.equal(secondUserProjects.response.status, 200);
   assert.deepEqual(secondUserProjects.body, []);
 
+  const secondUserCannotDeleteExpression = await requestJson(`/api/saved-expressions/${createdExpression.body.id}`, {
+    method: 'DELETE',
+    headers: secondUserHeaders
+  });
+  assert.equal(secondUserCannotDeleteExpression.response.status, 404);
+
   const createdProject = await requestJson('/api/projects', {
     method: 'POST',
     headers: secondUserHeaders,
@@ -91,6 +123,89 @@ async function run() {
   });
   assert.equal(createdProject.response.status, 200);
   assert.equal(createdProject.body.name, 'Private Test Project');
+
+  const secondUserCannotAttachGraphToAdminProject = await requestJson('/api/graph-configurations', {
+    method: 'POST',
+    headers: secondUserHeaders,
+    body: JSON.stringify({
+      projectId: adminProjectId,
+      name: 'Unauthorized Graph',
+      config: { expressions: ['sin(x)'] }
+    })
+  });
+  assert.equal(secondUserCannotAttachGraphToAdminProject.response.status, 404);
+
+  const createdGraph = await requestJson('/api/graph-configurations', {
+    method: 'POST',
+    headers: authHeaders,
+    body: JSON.stringify({
+      projectId: adminProjectId,
+      name: 'Admin Graph',
+      config: { expressions: ['sin(x)'], viewport: { xMin: -10, xMax: 10 } }
+    })
+  });
+  assert.equal(createdGraph.response.status, 200);
+  assert.equal(createdGraph.body.projectId, adminProjectId);
+
+  const updatedGraph = await requestJson(`/api/graph-configurations/${createdGraph.body.id}`, {
+    method: 'PUT',
+    headers: authHeaders,
+    body: JSON.stringify({ name: 'Updated Admin Graph' })
+  });
+  assert.equal(updatedGraph.response.status, 200);
+  assert.equal(updatedGraph.body.name, 'Updated Admin Graph');
+
+  const createdShare = await requestJson('/api/shared-workspaces', {
+    method: 'POST',
+    headers: authHeaders,
+    body: JSON.stringify({
+      projectId: adminProjectId,
+      sharedWithEmail: 'test@example.com',
+      role: 'viewer'
+    })
+  });
+  assert.equal(createdShare.response.status, 200);
+  assert.equal(createdShare.body.sharedWithEmail, 'test@example.com');
+  assert.equal(createdShare.body.role, 'viewer');
+
+  const updatedShare = await requestJson(`/api/shared-workspaces/${createdShare.body.id}`, {
+    method: 'PUT',
+    headers: authHeaders,
+    body: JSON.stringify({ role: 'editor' })
+  });
+  assert.equal(updatedShare.response.status, 200);
+  assert.equal(updatedShare.body.role, 'editor');
+
+  const outgoingShares = await requestJson('/api/shared-workspaces/outgoing', { headers: authHeaders });
+  assert.equal(outgoingShares.response.status, 200);
+  assert.equal(outgoingShares.body.length, 1);
+
+  const incomingShares = await requestJson('/api/shared-workspaces/incoming', { headers: secondUserHeaders });
+  assert.equal(incomingShares.response.status, 200);
+  assert.equal(incomingShares.body.length, 1);
+  assert.equal(incomingShares.body[0].projectId, adminProjectId);
+
+  const deletedShare = await requestJson(`/api/shared-workspaces/${createdShare.body.id}`, {
+    method: 'DELETE',
+    headers: authHeaders
+  });
+  assert.equal(deletedShare.response.status, 200);
+
+  const incomingAfterDelete = await requestJson('/api/shared-workspaces/incoming', { headers: secondUserHeaders });
+  assert.equal(incomingAfterDelete.response.status, 200);
+  assert.deepEqual(incomingAfterDelete.body, []);
+
+  const deletedExpression = await requestJson(`/api/saved-expressions/${createdExpression.body.id}`, {
+    method: 'DELETE',
+    headers: authHeaders
+  });
+  assert.equal(deletedExpression.response.status, 200);
+
+  const deletedGraph = await requestJson(`/api/graph-configurations/${createdGraph.body.id}`, {
+    method: 'DELETE',
+    headers: authHeaders
+  });
+  assert.equal(deletedGraph.response.status, 200);
 
   const anonymousHistory = await requestJson('/api/history');
   assert.equal(anonymousHistory.response.status, 200);

@@ -12,8 +12,8 @@ export interface DatabaseSchema {
   savedExpressions: SavedExpressionRecord[];
   calculationHistory: CalculationHistoryRecord[];
   projects: ProjectRecord[];
-  graphConfigurations: any[];
-  sharedWorkspaces: any[];
+  graphConfigurations: GraphConfigurationRecord[];
+  sharedWorkspaces: SharedWorkspaceRecord[];
 }
 
 export interface UserRecord {
@@ -58,6 +58,30 @@ export interface ProjectRecord {
   }>;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface GraphConfigurationRecord {
+  id: string;
+  userId: string;
+  projectId?: string;
+  name: string;
+  config: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SharedWorkspaceRecord {
+  id: string;
+  projectId: string;
+  ownerUserId: string;
+  sharedWithUserId: string;
+  role: "viewer" | "editor";
+  createdAt: string;
+  projectName?: string;
+  ownerEmail?: string;
+  ownerUsername?: string;
+  sharedWithEmail?: string;
+  sharedWithUsername?: string;
 }
 
 export const defaultDatabase: DatabaseSchema = {
