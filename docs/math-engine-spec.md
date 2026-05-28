@@ -27,20 +27,22 @@ Both the current TypeScript API and the Spring Boot backend must pass this corpu
 
 ## Phase 1 Coverage
 
-The first deterministic backend slice covers:
+The deterministic backend slice now covers:
 
 - Polynomial simplification, differentiation, integration, multiplication, division, factorization, and roots for bounded univariate polynomial expressions.
 - Algebra simplification, expansion, factorization, and numeric substitution for supported expressions.
-- Matrix addition, multiplication, determinant, inverse, and linear solve.
-- Simpson numerical integration.
-- Numerical limit approximation.
+- Matrix addition, multiplication, determinant, inverse, linear solve, LU, QR, and real eigenvalue/eigenvector decomposition.
+- Simpson numerical integration, Newton-Raphson, bisection, and polynomial curve fitting.
+- Numerical limit approximation, Taylor polynomials, and RK4 ODE integration.
 - Descriptive statistics.
+
+The Spring Boot backend uses EJML for dense matrix arithmetic and Apache Commons Math for decomposition, integration, curve fitting, and descriptive statistics.
 
 ## Later Coverage
 
 - Symbolic integration beyond polynomial power-rule cases.
 - Higher-degree factorization and exact algebra through Symja.
-- Apache Commons Math numerical solvers and statistical distributions.
-- EJML matrix decomposition coverage for LU, QR, eigenvalues, and eigenvectors.
+- Probability distributions and hypothesis testing.
+- Multivariable calculus and partial derivatives.
 - WebSocket-backed long-running calculation jobs with cancellation.
 - Performance tests for large expressions and matrix sizes.

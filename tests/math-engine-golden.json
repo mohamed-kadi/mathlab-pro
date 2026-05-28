@@ -92,6 +92,84 @@
       }
     },
     {
+      "id": "matrix.inverse.2x2",
+      "endpoint": "/api/math/matrix",
+      "request": {
+        "operation": "inverse",
+        "matrixA": [[1, 2], [3, 4]]
+      },
+      "expected": {
+        "status": 200,
+        "outputIncludes": ["Inversion"],
+        "numeric": [
+          { "path": "result.0.0", "value": -2, "tolerance": 0.000000001 },
+          { "path": "result.1.0", "value": 1.5, "tolerance": 0.000000001 }
+        ],
+        "stepsMin": 1
+      }
+    },
+    {
+      "id": "matrix.solve-linear.2x2",
+      "endpoint": "/api/math/matrix",
+      "request": {
+        "operation": "solveLinear",
+        "matrixA": [[2, 1], [1, -1]],
+        "vectorB": [5, 1]
+      },
+      "expected": {
+        "status": 200,
+        "outputIncludes": ["System"],
+        "numeric": [
+          { "path": "result.0", "value": 2, "tolerance": 0.000000001 },
+          { "path": "result.1", "value": 1, "tolerance": 0.000000001 }
+        ],
+        "stepsMin": 1
+      }
+    },
+    {
+      "id": "matrix.lu.2x2",
+      "endpoint": "/api/math/matrix",
+      "request": {
+        "operation": "lu",
+        "matrixA": [[4, 3], [6, 3]]
+      },
+      "expected": {
+        "status": 200,
+        "outputIncludes": ["LU"],
+        "stepsMin": 1
+      }
+    },
+    {
+      "id": "matrix.qr.2x2",
+      "endpoint": "/api/math/matrix",
+      "request": {
+        "operation": "qr",
+        "matrixA": [[1, 1], [1, -1]]
+      },
+      "expected": {
+        "status": 200,
+        "outputIncludes": ["QR"],
+        "stepsMin": 1
+      }
+    },
+    {
+      "id": "matrix.eigen.diagonal",
+      "endpoint": "/api/math/matrix",
+      "request": {
+        "operation": "eigen",
+        "matrixA": [[2, 0], [0, 3]]
+      },
+      "expected": {
+        "status": 200,
+        "outputIncludes": ["Eigenvalues"],
+        "numeric": [
+          { "path": "result.eigenvalues.0", "value": 2, "tolerance": 0.000000001 },
+          { "path": "result.eigenvalues.1", "value": 3, "tolerance": 0.000000001 }
+        ],
+        "stepsMin": 1
+      }
+    },
+    {
       "id": "numerical.integrate.simpson",
       "endpoint": "/api/math/numerical",
       "request": {
@@ -110,6 +188,29 @@
       }
     },
     {
+      "id": "numerical.curvefit.linear",
+      "endpoint": "/api/math/numerical",
+      "request": {
+        "method": "curvefit",
+        "degree": 1,
+        "points": [
+          { "x": 0, "y": 1 },
+          { "x": 1, "y": 3 },
+          { "x": 2, "y": 5 }
+        ]
+      },
+      "expected": {
+        "status": 200,
+        "outputIncludes": ["Equation Fit"],
+        "numeric": [
+          { "path": "result.coefficients.0", "value": 1, "tolerance": 0.000001 },
+          { "path": "result.coefficients.1", "value": 2, "tolerance": 0.000001 },
+          { "path": "result.r2", "value": 1, "tolerance": 0.000001 }
+        ],
+        "stepsMin": 2
+      }
+    },
+    {
       "id": "calculus.limit.sin-over-x",
       "endpoint": "/api/math/calculus",
       "request": {
@@ -122,6 +223,41 @@
         "outputIncludes": ["Limit"],
         "numeric": [
           { "path": "result.limit", "value": 1, "tolerance": 0.001 }
+        ],
+        "stepsMin": 2
+      }
+    },
+    {
+      "id": "calculus.taylor.polynomial",
+      "endpoint": "/api/math/calculus",
+      "request": {
+        "operation": "taylor",
+        "expression": "x^3 + 2*x^2 + x + 1",
+        "center": 0,
+        "degree": 3
+      },
+      "expected": {
+        "status": 200,
+        "outputIncludes": ["Taylor Polynomial", "x^3"],
+        "stepsMin": 2
+      }
+    },
+    {
+      "id": "calculus.ode.rk4-exponential",
+      "endpoint": "/api/math/calculus",
+      "request": {
+        "operation": "ode",
+        "expression": "y",
+        "x0": 0,
+        "y0": 1,
+        "xEnd": 1,
+        "stepsCount": 20
+      },
+      "expected": {
+        "status": 200,
+        "outputIncludes": ["Integrated"],
+        "numeric": [
+          { "path": "result.finalY", "value": 2.718281828, "tolerance": 0.00001 }
         ],
         "stepsMin": 2
       }

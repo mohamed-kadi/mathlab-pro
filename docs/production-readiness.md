@@ -10,7 +10,7 @@ MathLab Pro is useful today for local development, demos, and feature validation
 - Docker Compose starts the app, PostgreSQL, and Redis.
 - CI runs lint, unit tests, contract tests, build, Docker Compose validation, and Spring backend tests.
 - The Spring Boot backend has JWT auth, PostgreSQL/Flyway, Redis configuration, health/cache endpoints, OpenAPI UI wiring, and MockMvc tests.
-- Deterministic math-engine golden cases cover the current API and the first Spring backend math slice.
+- Deterministic math-engine golden cases cover the current API and the Spring backend library-backed math slice.
 
 ## Required Before Production
 

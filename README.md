@@ -103,7 +103,7 @@ GitHub Actions runs `npm ci`, `npm run lint`, `npm test`, `npm run build`, and `
 
 MathLab Pro is moving contract-first toward a Java 21/Spring Boot production backend. The React frontend and API behavior should stay stable while the backend is built endpoint by endpoint. New backend work should use [docs/openapi.yaml](docs/openapi.yaml) as the source contract.
 
-The Spring Boot backend is available under [backend](backend/README.md). It currently includes Spring Security JWT auth, PostgreSQL/Flyway schema, Redis cache configuration, health/cache endpoints, OpenAPI UI wiring, and MockMvc tests. Run it independently with:
+The Spring Boot backend is available under [backend](backend/README.md). It currently includes Spring Security JWT auth, PostgreSQL/Flyway schema, Redis cache configuration, health/cache endpoints, deterministic math endpoints, OpenAPI UI wiring, and MockMvc tests. Run it independently with:
 
 ```bash
 cd backend

@@ -11,6 +11,23 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.function.DoubleUnaryOperator;
 import java.util.regex.Pattern;
+import org.apache.commons.math3.analysis.UnivariateFunction;
+import org.apache.commons.math3.analysis.integration.SimpsonIntegrator;
+import org.apache.commons.math3.fitting.PolynomialCurveFitter;
+import org.apache.commons.math3.fitting.WeightedObservedPoints;
+import org.apache.commons.math3.linear.EigenDecomposition;
+import org.apache.commons.math3.linear.LUDecomposition;
+import org.apache.commons.math3.linear.QRDecomposition;
+import org.apache.commons.math3.linear.RealMatrix;
+import org.apache.commons.math3.linear.RealVector;
+import org.apache.commons.math3.linear.MatrixUtils;
+import org.apache.commons.math3.stat.descriptive.moment.Mean;
+import org.apache.commons.math3.stat.descriptive.moment.StandardDeviation;
+import org.apache.commons.math3.stat.descriptive.moment.Variance;
+import org.apache.commons.math3.stat.descriptive.rank.Max;
+import org.apache.commons.math3.stat.descriptive.rank.Median;
+import org.apache.commons.math3.stat.descriptive.rank.Min;
+import org.ejml.simple.SimpleMatrix;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -121,29 +138,60 @@ public class MathEngineService {
                 if (matrixA[0].length != matrixB.length) {
                     throw badRequest("Matrix multiplication requires columns(A) to equal rows(B).");
                 }
-                yield data("Matrix multiplication computed successfully.", multiply(matrixA, matrixB), List.of("Computed each cell as a row/column dot product."));
+                yield data("Matrix multiplication computed successfully.", toArray(simpleMatrix(matrixA).mult(simpleMatrix(matrixB))), List.of(
+                    "Computed A * B using EJML dense matrix multiplication."
+                ));
             }
             case "determinant" -> {
                 assertSquare(matrixA, "Matrix A");
-                double determinant = determinant(matrixA);
+                double determinant = simpleMatrix(matrixA).determinant();
                 yield data("Determinant: det(A) = " + formatNumber(determinant), Map.of("determinant", determinant), List.of(
-                    "Applied Gaussian elimination with partial pivoting.",
-                    "Multiplied diagonal pivots with row-swap sign."
+                    "Computed determinant using EJML dense matrix routines."
                 ));
             }
             case "inverse" -> {
                 assertSquare(matrixA, "Matrix A");
-                yield data("Inversion matrix generated.", inverse(matrixA), List.of("Applied Gauss-Jordan elimination on [A | I]."));
+                yield data("Inversion matrix generated.", toArray(simpleMatrix(matrixA).invert()), List.of(
+                    "Computed inverse using EJML dense linear algebra."
+                ));
+            }
+            case "lu" -> {
+                assertSquare(matrixA, "Matrix A");
+                LUDecomposition decomposition = new LUDecomposition(realMatrix(matrixA));
+                Map<String, Object> result = new LinkedHashMap<>();
+                result.put("L", matrixData(decomposition.getL()));
+                result.put("U", matrixData(decomposition.getU()));
+                result.put("P", matrixData(decomposition.getP()));
+                yield data("LU Triangular decomposition completed.", result, List.of(
+                    "Computed PA = LU using Apache Commons Math LUDecomposition."
+                ));
+            }
+            case "qr" -> {
+                QRDecomposition decomposition = new QRDecomposition(realMatrix(matrixA));
+                Map<String, Object> result = new LinkedHashMap<>();
+                result.put("Q", matrixData(decomposition.getQ()));
+                result.put("R", matrixData(decomposition.getR()));
+                yield data("QR Orthogonal-triangular decomposition computed.", result, List.of(
+                    "Computed A = QR using Apache Commons Math QRDecomposition."
+                ));
+            }
+            case "eigen" -> {
+                assertSquare(matrixA, "Matrix A");
+                EigenDecomposition decomposition = new EigenDecomposition(realMatrix(matrixA));
+                Map<String, Object> result = eigenResult(decomposition);
+                yield data("Eigenvalues and eigenvectors computed.", result, List.of(
+                    "Computed eigen decomposition using Apache Commons Math.",
+                    "Sorted eigenvalues by ascending real value for stable output."
+                ));
             }
             case "solveLinear" -> {
                 assertSquare(matrixA, "Matrix A");
                 double[] vector = numericVector(request.get("vectorB"), matrixA.length, "Vector b");
-                double[] solution = solveLinear(matrixA, vector);
+                double[] solution = toVector(simpleMatrix(matrixA).solve(columnVector(vector)));
                 yield data("System solutions: x = " + vectorText(solution), solution, List.of(
-                    "Solved Ax = b using Gaussian elimination with partial pivoting."
+                    "Solved Ax = b using EJML dense linear algebra."
                 ));
             }
-            case "lu", "qr", "eigen" -> throw badRequest("This matrix operation is planned for the EJML-backed backend phase.");
             default -> throw badRequest("Unsupported matrix operation.");
         };
     }
@@ -159,9 +207,9 @@ public class MathEngineService {
                 if (Math.abs(lower - upper) < EPSILON) {
                     throw badRequest("Integration bounds must be distinct finite numbers.");
                 }
-                double area = simpson(expression, lower, upper, 100);
+                double area = simpson(expression, lower, upper);
                 yield data("Numerical Area approximated: " + formatNumber(area), Map.of("area", area), List.of(
-                    "Used Simpson's 1/3 rule with 100 intervals.",
+                    "Used Apache Commons Math Simpson integration.",
                     "Integrated from " + formatNumber(lower) + " to " + formatNumber(upper) + "."
                 ));
             }
@@ -178,27 +226,48 @@ public class MathEngineService {
                 double root = newton(expression, initialGuess);
                 yield data("Root approximated: x ≈ " + formatNumber(root), Map.of("root", root), List.of("Applied Newton-Raphson with central-difference derivative."));
             }
-            case "curvefit" -> throw badRequest("Curve fitting is planned for the Apache Commons Math backend phase.");
+            case "curvefit" -> {
+                int degree = integerValue(request.get("degree"), 1, 1, 6, "Curve fitting degree");
+                CurveFitResult fit = curveFit(request.get("points"), degree);
+                yield data("Equation Fit: y = " + fit.equation() + " (R^2 = " + formatNumber(fit.r2()) + ")", fit.toMap(), fit.steps());
+            }
             default -> throw badRequest("Unsupported numerical method.");
         };
     }
 
     public Map<String, Object> calculus(Map<String, Object> request) {
         String operation = requiredString(request, "operation");
-        if (!"limit".equals(operation)) {
-            throw badRequest("This calculus operation is planned for the symbolic backend phase.");
-        }
-
-        String expression = requiredExpression(request, "expression");
-        double center = finiteNumber(request.get("center"), "Limit center");
-        LimitResult limit = limit(expression, center);
-        String output = limit.exists()
-            ? "Limit: " + formatNumber(limit.value())
-            : "Limit does not exist. Reason: " + limit.reason();
-        return data(output, limit.toMap(), List.of(
-            "Evaluated the expression from both sides of the center.",
-            limit.exists() ? "Left and right approximations converged." : limit.reason()
-        ));
+        return switch (operation) {
+            case "limit" -> {
+                String expression = requiredExpression(request, "expression");
+                double center = finiteNumber(request.get("center"), "Limit center");
+                LimitResult limit = limit(expression, center);
+                String output = limit.exists()
+                    ? "Limit: " + formatNumber(limit.value())
+                    : "Limit does not exist. Reason: " + limit.reason();
+                yield data(output, limit.toMap(), List.of(
+                    "Evaluated the expression from both sides of the center.",
+                    limit.exists() ? "Left and right approximations converged." : limit.reason()
+                ));
+            }
+            case "taylor" -> {
+                String expression = requiredExpression(request, "expression");
+                double center = finiteNumber(request.get("center"), "Taylor center");
+                int degree = integerValue(request.get("degree"), 4, 0, 12, "Taylor degree");
+                TaylorResult result = taylor(expression, center, degree);
+                yield data("Taylor Polynomial: " + result.polynomial(), result.toMap(), result.steps());
+            }
+            case "ode" -> {
+                String expression = requiredExpression(request, "expression");
+                double x0 = finiteNumber(request.get("x0"), "ODE x0");
+                double y0 = finiteNumber(request.get("y0"), "ODE y0");
+                double xEnd = finiteNumber(request.get("xEnd"), "ODE xEnd");
+                int stepsCount = integerValue(request.get("stepsCount"), 100, 1, 5000, "ODE step count");
+                OdeResult result = rk4(expression, x0, y0, xEnd, stepsCount);
+                yield data("Integrated dy/dx at x = " + formatNumber(xEnd) + ": y(" + formatNumber(xEnd) + ") ≈ " + formatNumber(result.finalY()), result.toMap(), result.steps());
+            }
+            default -> throw badRequest("Unsupported calculus operation.");
+        };
     }
 
     public Map<String, Object> statistics(Map<String, Object> request) {
@@ -298,16 +367,10 @@ public class MathEngineService {
             : "(" + variable + " + " + formatNumber(Math.abs(root)) + ")";
     }
 
-    private static double simpson(String expression, double lower, double upper, int intervals) {
+    private static double simpson(String expression, double lower, double upper) {
         Expression parsed = ExpressionParser.parse(expression);
-        int n = intervals % 2 == 0 ? intervals : intervals + 1;
-        double h = (upper - lower) / n;
-        double sum = parsed.eval(Map.of("x", lower)) + parsed.eval(Map.of("x", upper));
-        for (int i = 1; i < n; i++) {
-            double x = lower + i * h;
-            sum += (i % 2 == 0 ? 2 : 4) * parsed.eval(Map.of("x", x));
-        }
-        return (h / 3.0) * sum;
+        UnivariateFunction function = x -> parsed.eval(Map.of("x", x));
+        return new SimpsonIntegrator().integrate(10_000, function, lower, upper);
     }
 
     private static double bisection(String expression, double lower, double upper) {
@@ -365,6 +428,116 @@ public class MathEngineService {
         return new LimitResult(false, null, "Left and right limits do not match.");
     }
 
+    private static CurveFitResult curveFit(Object value, int degree) {
+        List<?> points = listValue(value, "Curve fitting points");
+        if (points.size() <= degree || points.size() > 100) {
+            throw badRequest("Curve fitting requires more points than degree and at most 100 points.");
+        }
+
+        WeightedObservedPoints observations = new WeightedObservedPoints();
+        double[] xs = new double[points.size()];
+        double[] ys = new double[points.size()];
+        for (int i = 0; i < points.size(); i++) {
+            if (!(points.get(i) instanceof Map<?, ?> point)) {
+                throw badRequest("Curve fitting points must be objects with x and y values.");
+            }
+            double x = finiteNumber(point.get("x"), "Curve fitting point x");
+            double y = finiteNumber(point.get("y"), "Curve fitting point y");
+            xs[i] = x;
+            ys[i] = y;
+            observations.add(x, y);
+        }
+
+        double[] coefficients = PolynomialCurveFitter.create(degree).fit(observations.toList());
+        String equation = polynomialFromCoefficients(coefficients);
+        double r2 = rSquared(xs, ys, coefficients);
+        List<String> steps = List.of(
+            "Fitted polynomial degree " + degree + " with Apache Commons Math least squares.",
+            "Solved coefficients in ascending powers of x.",
+            "Computed coefficient of determination R^2 = " + formatNumber(r2) + "."
+        );
+        return new CurveFitResult(coefficients, equation, r2, steps);
+    }
+
+    private static double rSquared(double[] xs, double[] ys, double[] coefficients) {
+        double mean = new Mean().evaluate(ys);
+        double total = 0.0;
+        double residual = 0.0;
+        for (int i = 0; i < xs.length; i++) {
+            total += Math.pow(ys[i] - mean, 2);
+            residual += Math.pow(ys[i] - evaluatePolynomial(coefficients, xs[i]), 2);
+        }
+        return Math.abs(total) < EPSILON ? 1.0 : 1.0 - residual / total;
+    }
+
+    private static TaylorResult taylor(String expression, double center, int degree) {
+        Expression parsed = ExpressionParser.parse(expression);
+        double[] coefficients;
+        List<String> steps = new ArrayList<>();
+        steps.add("Computing Taylor polynomial centered at " + formatNumber(center) + " through degree " + degree + ".");
+
+        try {
+            Polynomial polynomial = parsed.polynomial("x");
+            coefficients = exactTaylorCoefficients(polynomial, center, degree);
+            steps.add("Used exact polynomial coefficient transformation.");
+        } catch (ApiException exception) {
+            if (degree > 6) {
+                throw badRequest("Numerical Taylor expansion currently supports degree 6 or lower for non-polynomial expressions.");
+            }
+            coefficients = new double[degree + 1];
+            for (int order = 0; order <= degree; order++) {
+                coefficients[order] = finiteDerivative(parsed, center, order) / factorial(order);
+            }
+            steps.add("Used bounded central finite differences for non-polynomial derivatives.");
+        }
+
+        String polynomial = taylorPolynomialText(coefficients, center);
+        steps.add("Taylor polynomial: " + polynomial);
+        return new TaylorResult(polynomial, coefficients, steps);
+    }
+
+    private static double[] exactTaylorCoefficients(Polynomial polynomial, double center, int degree) {
+        double[] coefficients = new double[degree + 1];
+        for (int order = 0; order <= degree; order++) {
+            double coefficient = 0.0;
+            for (int power = order; power <= polynomial.degree(); power++) {
+                coefficient += polynomial.coefficient(power) * binomial(power, order) * Math.pow(center, power - order);
+            }
+            coefficients[order] = coefficient;
+        }
+        return coefficients;
+    }
+
+    private static double finiteDerivative(Expression expression, double center, int order) {
+        if (order == 0) return expression.eval(Map.of("x", center));
+        double h = 1e-4;
+        return (finiteDerivative(expression, center + h, order - 1) - finiteDerivative(expression, center - h, order - 1)) / (2.0 * h);
+    }
+
+    private static OdeResult rk4(String expression, double x0, double y0, double xEnd, int stepsCount) {
+        Expression parsed = ExpressionParser.parse(expression);
+        double h = (xEnd - x0) / stepsCount;
+        double x = x0;
+        double y = y0;
+        List<Map<String, Double>> results = new ArrayList<>();
+        List<String> steps = new ArrayList<>();
+        results.add(Map.of("x", x, "y", y));
+        steps.add("RK4 integration from x0 = " + formatNumber(x0) + " to xEnd = " + formatNumber(xEnd) + " with h = " + formatNumber(h) + ".");
+
+        for (int i = 0; i < stepsCount; i++) {
+            double k1 = parsed.eval(Map.of("x", x, "y", y));
+            double k2 = parsed.eval(Map.of("x", x + h / 2.0, "y", y + h * k1 / 2.0));
+            double k3 = parsed.eval(Map.of("x", x + h / 2.0, "y", y + h * k2 / 2.0));
+            double k4 = parsed.eval(Map.of("x", x + h, "y", y + h * k3));
+            y += (h / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4);
+            x += h;
+            results.add(Map.of("x", x, "y", y));
+        }
+
+        steps.add("Final integrated value y(" + formatNumber(x) + ") ≈ " + formatNumber(y) + ".");
+        return new OdeResult(results, y, steps);
+    }
+
     private static double safeEval(Expression expression, double x) {
         try {
             double value = expression.eval(Map.of("x", x));
@@ -376,18 +549,12 @@ public class MathEngineService {
 
     private static Map<String, Object> statisticsSummary(double[] numbers) {
         int n = numbers.length;
-        double sum = 0.0;
-        for (double number : numbers) sum += number;
-        double mean = sum / n;
-        double[] sorted = numbers.clone();
-        java.util.Arrays.sort(sorted);
-        double median = n % 2 == 0 ? (sorted[n / 2 - 1] + sorted[n / 2]) / 2.0 : sorted[n / 2];
-        double sumSquares = 0.0;
-        for (double number : numbers) {
-            sumSquares += Math.pow(number - mean, 2);
-        }
-        double variance = n > 1 ? sumSquares / (n - 1) : 0.0;
-        double stdDev = Math.sqrt(variance);
+        double mean = new Mean().evaluate(numbers);
+        double median = new Median().evaluate(numbers);
+        double variance = new Variance(true).evaluate(numbers);
+        double stdDev = new StandardDeviation(true).evaluate(numbers);
+        double min = new Min().evaluate(numbers);
+        double max = new Max().evaluate(numbers);
         double margin = 1.96 * (stdDev / Math.sqrt(n));
 
         Map<Double, Integer> frequencies = new LinkedHashMap<>();
@@ -404,117 +571,68 @@ public class MathEngineService {
         result.put("mode", mode);
         result.put("variance", variance);
         result.put("stdDev", stdDev);
-        result.put("min", sorted[0]);
-        result.put("max", sorted[n - 1]);
+        result.put("min", min);
+        result.put("max", max);
         result.put("confidenceInterval95", List.of(mean - margin, mean + margin));
         return result;
     }
 
-    private static double[][] multiply(double[][] left, double[][] right) {
-        double[][] result = new double[left.length][right[0].length];
-        for (int row = 0; row < left.length; row++) {
-            for (int col = 0; col < right[0].length; col++) {
-                for (int k = 0; k < left[0].length; k++) {
-                    result[row][col] += left[row][k] * right[k][col];
-                }
+    private static SimpleMatrix simpleMatrix(double[][] matrix) {
+        return new SimpleMatrix(matrix);
+    }
+
+    private static SimpleMatrix columnVector(double[] vector) {
+        SimpleMatrix matrix = new SimpleMatrix(vector.length, 1);
+        for (int row = 0; row < vector.length; row++) {
+            matrix.set(row, 0, vector[row]);
+        }
+        return matrix;
+    }
+
+    private static double[][] toArray(SimpleMatrix matrix) {
+        double[][] result = new double[matrix.numRows()][matrix.numCols()];
+        for (int row = 0; row < matrix.numRows(); row++) {
+            for (int col = 0; col < matrix.numCols(); col++) {
+                result[row][col] = matrix.get(row, col);
             }
         }
         return result;
     }
 
-    private static double determinant(double[][] matrix) {
-        double[][] copy = copy(matrix);
-        double determinant = 1.0;
-        int sign = 1;
-        for (int pivot = 0; pivot < copy.length; pivot++) {
-            int pivotRow = pivotRow(copy, pivot);
-            if (Math.abs(copy[pivotRow][pivot]) < EPSILON) return 0.0;
-            if (pivotRow != pivot) {
-                double[] temp = copy[pivot];
-                copy[pivot] = copy[pivotRow];
-                copy[pivotRow] = temp;
-                sign *= -1;
-            }
-            determinant *= copy[pivot][pivot];
-            for (int row = pivot + 1; row < copy.length; row++) {
-                double factor = copy[row][pivot] / copy[pivot][pivot];
-                for (int col = pivot; col < copy.length; col++) {
-                    copy[row][col] -= factor * copy[pivot][col];
-                }
-            }
-        }
-        return determinant * sign;
-    }
-
-    private static double[][] inverse(double[][] matrix) {
-        int n = matrix.length;
-        double[][] augmented = new double[n][2 * n];
-        for (int row = 0; row < n; row++) {
-            System.arraycopy(matrix[row], 0, augmented[row], 0, n);
-            augmented[row][n + row] = 1.0;
-        }
-        gaussJordan(augmented, n);
-        double[][] inverse = new double[n][n];
-        for (int row = 0; row < n; row++) {
-            System.arraycopy(augmented[row], n, inverse[row], 0, n);
-        }
-        return inverse;
-    }
-
-    private static double[] solveLinear(double[][] matrix, double[] vector) {
-        int n = matrix.length;
-        double[][] augmented = new double[n][n + 1];
-        for (int row = 0; row < n; row++) {
-            System.arraycopy(matrix[row], 0, augmented[row], 0, n);
-            augmented[row][n] = vector[row];
-        }
-        gaussJordan(augmented, n);
-        double[] result = new double[n];
-        for (int row = 0; row < n; row++) {
-            result[row] = augmented[row][n];
+    private static double[] toVector(SimpleMatrix matrix) {
+        double[] result = new double[matrix.numRows()];
+        for (int row = 0; row < matrix.numRows(); row++) {
+            result[row] = matrix.get(row, 0);
         }
         return result;
     }
 
-    private static void gaussJordan(double[][] augmented, int pivotColumns) {
-        for (int pivot = 0; pivot < pivotColumns; pivot++) {
-            int pivotRow = pivotRow(augmented, pivot);
-            if (Math.abs(augmented[pivotRow][pivot]) < EPSILON) {
-                throw badRequest("Matrix is singular.");
-            }
-            double[] temp = augmented[pivot];
-            augmented[pivot] = augmented[pivotRow];
-            augmented[pivotRow] = temp;
-            double divisor = augmented[pivot][pivot];
-            for (int col = 0; col < augmented[pivot].length; col++) {
-                augmented[pivot][col] /= divisor;
-            }
-            for (int row = 0; row < augmented.length; row++) {
-                if (row == pivot) continue;
-                double factor = augmented[row][pivot];
-                for (int col = 0; col < augmented[row].length; col++) {
-                    augmented[row][col] -= factor * augmented[pivot][col];
-                }
-            }
-        }
+    private static RealMatrix realMatrix(double[][] matrix) {
+        return MatrixUtils.createRealMatrix(matrix);
     }
 
-    private static int pivotRow(double[][] matrix, int pivot) {
-        int row = pivot;
-        for (int candidate = pivot + 1; candidate < matrix.length; candidate++) {
-            if (Math.abs(matrix[candidate][pivot]) > Math.abs(matrix[row][pivot])) {
-                row = candidate;
-            }
-        }
-        return row;
+    private static double[][] matrixData(RealMatrix matrix) {
+        return matrix.getData();
     }
 
-    private static double[][] copy(double[][] matrix) {
-        double[][] copy = new double[matrix.length][matrix[0].length];
-        for (int row = 0; row < matrix.length; row++) {
-            System.arraycopy(matrix[row], 0, copy[row], 0, matrix[row].length);
+    private static Map<String, Object> eigenResult(EigenDecomposition decomposition) {
+        double[] values = decomposition.getRealEigenvalues();
+        List<Integer> order = new ArrayList<>();
+        for (int i = 0; i < values.length; i++) order.add(i);
+        order.sort(Comparator.comparingDouble(index -> values[index]));
+
+        List<Double> eigenvalues = new ArrayList<>();
+        List<double[]> eigenvectors = new ArrayList<>();
+        for (Integer index : order) {
+            eigenvalues.add(values[index]);
+            RealVector vector = decomposition.getEigenvector(index);
+            eigenvectors.add(vector == null ? new double[0] : vector.toArray());
         }
-        return copy;
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("eigenvalues", eigenvalues);
+        result.put("eigenvectors", eigenvectors);
+        return result;
     }
 
     private static String requiredString(Map<String, Object> request, String field) {
@@ -548,6 +666,24 @@ public class MathEngineService {
         double parsed = number.doubleValue();
         if (!Double.isFinite(parsed)) {
             throw badRequest(label + " must be a finite number.");
+        }
+        return parsed;
+    }
+
+    private static int integerValue(Object value, int fallback, int min, int max, String label) {
+        int parsed;
+        if (value == null) {
+            parsed = fallback;
+        } else if (value instanceof Number number) {
+            parsed = number.intValue();
+            if (Math.abs(number.doubleValue() - parsed) > EPSILON) {
+                throw badRequest(label + " must be an integer.");
+            }
+        } else {
+            throw badRequest(label + " must be an integer.");
+        }
+        if (parsed < min || parsed > max) {
+            throw badRequest(label + " must be between " + min + " and " + max + ".");
         }
         return parsed;
     }
@@ -612,6 +748,74 @@ public class MathEngineService {
         return values.toString();
     }
 
+    private static String polynomialFromCoefficients(double[] coefficients) {
+        List<String> terms = new ArrayList<>();
+        for (int power = coefficients.length - 1; power >= 0; power--) {
+            double coefficient = coefficients[power];
+            if (Math.abs(coefficient) < EPSILON) continue;
+            terms.add(signedTerm(coefficient, power, "x", terms.isEmpty()));
+        }
+        return terms.isEmpty() ? "0" : String.join("", terms).trim();
+    }
+
+    private static double evaluatePolynomial(double[] coefficients, double x) {
+        double result = 0.0;
+        for (int power = 0; power < coefficients.length; power++) {
+            result += coefficients[power] * Math.pow(x, power);
+        }
+        return result;
+    }
+
+    private static String taylorPolynomialText(double[] coefficients, double center) {
+        List<String> terms = new ArrayList<>();
+        for (int power = 0; power < coefficients.length; power++) {
+            double coefficient = coefficients[power];
+            if (Math.abs(coefficient) < 1e-8) continue;
+            terms.add(signedTaylorTerm(coefficient, power, center, terms.isEmpty()));
+        }
+        return terms.isEmpty() ? "0" : String.join("", terms).trim();
+    }
+
+    private static String signedTerm(double coefficient, int power, String variable, boolean first) {
+        String sign = coefficient < 0 ? (first ? "-" : " - ") : (first ? "" : " + ");
+        double absolute = Math.abs(coefficient);
+        if (power == 0) return sign + formatNumber(absolute);
+        String variablePart = power == 1 ? variable : variable + "^" + power;
+        if (Math.abs(absolute - 1.0) < EPSILON) return sign + variablePart;
+        return sign + formatNumber(absolute) + "*" + variablePart;
+    }
+
+    private static String signedTaylorTerm(double coefficient, int power, double center, boolean first) {
+        String sign = coefficient < 0 ? (first ? "-" : " - ") : (first ? "" : " + ");
+        double absolute = Math.abs(coefficient);
+        if (power == 0) return sign + formatNumber(absolute);
+        String variablePart;
+        if (Math.abs(center) < EPSILON) {
+            variablePart = power == 1 ? "x" : "x^" + power;
+        } else {
+            String shifted = center > 0 ? "(x - " + formatNumber(center) + ")" : "(x + " + formatNumber(Math.abs(center)) + ")";
+            variablePart = power == 1 ? shifted : shifted + "^" + power;
+        }
+        if (Math.abs(absolute - 1.0) < EPSILON) return sign + variablePart;
+        return sign + formatNumber(absolute) + "*" + variablePart;
+    }
+
+    private static long binomial(int n, int k) {
+        if (k < 0 || k > n) return 0;
+        if (k == 0 || k == n) return 1;
+        long result = 1;
+        for (int i = 1; i <= k; i++) {
+            result = result * (n - i + 1) / i;
+        }
+        return result;
+    }
+
+    private static long factorial(int n) {
+        long result = 1;
+        for (int i = 2; i <= n; i++) result *= i;
+        return result;
+    }
+
     private static ApiException badRequest(String message) {
         return new ApiException(HttpStatus.BAD_REQUEST, message);
     }
@@ -638,6 +842,35 @@ public class MathEngineService {
             result.put("exists", exists);
             result.put("limit", value);
             if (reason != null) result.put("reason", reason);
+            return result;
+        }
+    }
+
+    private record CurveFitResult(double[] coefficients, String equation, double r2, List<String> steps) {
+        Map<String, Object> toMap() {
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("coefficients", coefficients);
+            result.put("equation", equation);
+            result.put("r2", r2);
+            return result;
+        }
+    }
+
+    private record TaylorResult(String polynomial, double[] coefficients, List<String> steps) {
+        Map<String, Object> toMap() {
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("polynomial", polynomial);
+            result.put("coefficients", coefficients);
+            result.put("latex", polynomial);
+            return result;
+        }
+    }
+
+    private record OdeResult(List<Map<String, Double>> results, double finalY, List<String> steps) {
+        Map<String, Object> toMap() {
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("results", results);
+            result.put("finalY", finalY);
             return result;
         }
     }
