@@ -158,10 +158,8 @@ async function verifyPassword(user: UserRecord, password: string, db: DatabaseSc
   return false;
 }
 
-async function startServer() {
+export async function createApp() {
   const app = express();
-  const PORT = Number(process.env.PORT || 3000);
-  const HOST = process.env.HOST || process.env.HOSTNAME || "0.0.0.0";
 
   // Middleware
   app.disable("x-powered-by");
@@ -779,7 +777,7 @@ async function startServer() {
   });
 
   // Serve static assets or run Vite middleware
-  if (process.env.NODE_ENV !== "production") {
+  if (process.env.NODE_ENV !== "production" && process.env.NODE_ENV !== "test") {
     const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -794,9 +792,19 @@ async function startServer() {
     });
   }
 
+  return app;
+}
+
+export async function startServer() {
+  const app = await createApp();
+  const PORT = Number(process.env.PORT || 3000);
+  const HOST = process.env.HOST || process.env.HOSTNAME || "0.0.0.0";
+
   app.listen(PORT, HOST, () => {
     console.log(`Server running on http://${HOST}:${PORT}`);
   });
 }
 
-startServer();
+if (process.env.NODE_ENV !== "test") {
+  startServer();
+}

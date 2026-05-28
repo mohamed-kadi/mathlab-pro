@@ -56,10 +56,19 @@ npm run dev
 
 The dev server runs the Express API and Vite middleware together.
 
+## Tests
+
+```bash
+npm test
+```
+
+The current test script runs smoke/integration coverage for auth, authorization, project isolation, history persistence, math APIs, and spreadsheet formula safety against an isolated temporary JSON database.
+
 ## Build And Run
 
 ```bash
 npm run lint
+npm test
 npm run build
 npm start
 ```

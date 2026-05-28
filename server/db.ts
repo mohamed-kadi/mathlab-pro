@@ -1,8 +1,11 @@
 import fs from 'fs';
 import path from 'path';
 
-const DB_DIR = path.join(process.cwd(), 'data');
-const DB_FILE = path.join(DB_DIR, 'db.json');
+function getDbFile() {
+  return process.env.MATHLAB_DB_FILE
+    ? path.resolve(process.env.MATHLAB_DB_FILE)
+    : path.join(process.cwd(), 'data', 'db.json');
+}
 
 export interface DatabaseSchema {
   users: UserRecord[];
@@ -116,30 +119,32 @@ const defaultDatabase: DatabaseSchema = {
 };
 
 function ensureDirExists() {
-  if (!fs.existsSync(DB_DIR)) {
-    fs.mkdirSync(DB_DIR, { recursive: true });
+  const dbDir = path.dirname(getDbFile());
+  if (!fs.existsSync(dbDir)) {
+    fs.mkdirSync(dbDir, { recursive: true });
   }
 }
 
 export function readDb(): DatabaseSchema {
   ensureDirExists();
-  if (!fs.existsSync(DB_FILE)) {
-    fs.writeFileSync(DB_FILE, JSON.stringify(defaultDatabase, null, 2), 'utf-8');
-    return defaultDatabase;
+  const dbFile = getDbFile();
+  if (!fs.existsSync(dbFile)) {
+    fs.writeFileSync(dbFile, JSON.stringify(defaultDatabase, null, 2), 'utf-8');
+    return JSON.parse(JSON.stringify(defaultDatabase));
   }
   try {
-    const data = fs.readFileSync(DB_FILE, 'utf-8');
+    const data = fs.readFileSync(dbFile, 'utf-8');
     return JSON.parse(data);
   } catch (error) {
     console.error("Failed to read database file, reverting to default:", error);
-    return defaultDatabase;
+    return JSON.parse(JSON.stringify(defaultDatabase));
   }
 }
 
 export function writeDb(db: DatabaseSchema) {
   ensureDirExists();
   try {
-    fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), 'utf-8');
+    fs.writeFileSync(getDbFile(), JSON.stringify(db, null, 2), 'utf-8');
   } catch (error) {
     console.error("Failed to write to database file:", error);
   }
