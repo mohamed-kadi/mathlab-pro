@@ -5,12 +5,56 @@ const DB_DIR = path.join(process.cwd(), 'data');
 const DB_FILE = path.join(DB_DIR, 'db.json');
 
 export interface DatabaseSchema {
-  users: any[];
-  savedExpressions: any[];
-  calculationHistory: any[];
-  projects: any[];
+  users: UserRecord[];
+  savedExpressions: SavedExpressionRecord[];
+  calculationHistory: CalculationHistoryRecord[];
+  projects: ProjectRecord[];
   graphConfigurations: any[];
   sharedWorkspaces: any[];
+}
+
+export interface UserRecord {
+  id: string;
+  username: string;
+  email: string;
+  passwordHash: string;
+  createdAt: string;
+}
+
+export interface SavedExpressionRecord {
+  id: string;
+  userId: string;
+  name: string;
+  rawExpression: string;
+  latexExpression: string;
+  createdAt: string;
+}
+
+export interface CalculationHistoryRecord {
+  id: string;
+  userId?: string;
+  type: string;
+  input: string;
+  output: string;
+  latexInput?: string;
+  latexOutput?: string;
+  steps?: string[];
+  explanation?: string;
+  createdAt: string;
+}
+
+export interface ProjectRecord {
+  id: string;
+  userId: string;
+  name: string;
+  description: string;
+  sheets: Array<{
+    id: string;
+    name: string;
+    cells: Record<string, string>;
+  }>;
+  createdAt: string;
+  updatedAt: string;
 }
 
 const defaultDatabase: DatabaseSchema = {
@@ -19,7 +63,7 @@ const defaultDatabase: DatabaseSchema = {
       id: "admin",
       username: "Guest Professor",
       email: "guest@mathlab.edu",
-      passwordHash: "$2b$10$abcdefghijklmnopqrstuv", // Simulated bcrypt
+      passwordHash: "$2b$12$ldBaTl5N1pY9/J2mwwJRs.kzms5oID4uYGph.x1p.t/M3IOyvhboe",
       createdAt: new Date().toISOString()
     }
   ],

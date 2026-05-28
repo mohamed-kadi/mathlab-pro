@@ -1,6 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Briefcase, Plus, Sheet, RefreshCw, Trash2, Edit2, Play } from 'lucide-react';
+import { create, all } from 'mathjs';
 import { Project, SpreadsheetData } from '../types';
+
+const math = create(all);
+const CELL_PATTERN = /^[A-D][1-5]$/;
 
 interface WorkspaceSpreadsheetProps {
   token?: string | null;
@@ -119,35 +123,30 @@ export default function WorkspaceSpreadsheet({ token }: WorkspaceSpreadsheetProp
     }
   };
 
-  const evaluateCellVal = (cells: Record<string, string>, currentCell: string): string => {
+  const evaluateCellVal = (cells: Record<string, string>, currentCell: string, visited = new Set<string>()): string => {
     const rawValue = cells[currentCell] || '';
     if (!rawValue.startsWith('=')) return rawValue;
+    if (visited.has(currentCell)) return "#CYCLE!";
 
-    // Evaluate cell expressions recursively/safely (e.g., =A1 + B1)
+    // Evaluate arithmetic-only spreadsheet formulas without executing JavaScript.
     try {
+      visited.add(currentCell);
       const formula = rawValue.substring(1); // Strip '='
+      const tokens = formula.match(/[A-Z]\d+|\d+(?:\.\d+)?|[+\-*/^%()]|\s+/g) || [];
+      if (tokens.join('') !== formula) return "#VALUE!";
+
       const variablesScope: Record<string, number> = {};
+      const referencedCells = Array.from(new Set(tokens.filter(token => /^[A-Z]\d+$/.test(token))));
+      for (const cellId of referencedCells) {
+        if (!CELL_PATTERN.test(cellId)) return "#REF!";
+        const dep = evaluateCellVal(cells, cellId, new Set(visited));
+        const numericValue = Number(dep);
+        if (!Number.isFinite(numericValue)) return "#REF!";
+        variablesScope[cellId] = numericValue;
+      }
 
-      // Parse cell contents to register in scope
-      Object.keys(cells).forEach(cId => {
-        if (cId === currentCell) return;
-        const val = cells[cId] || '';
-        if (val && !val.startsWith('=')) {
-          variablesScope[cId] = parseFloat(val) || 0;
-        } else if (val) {
-          // evaluate dependent cells
-          const dep = evaluateCellVal(cells, cId);
-          variablesScope[cId] = parseFloat(dep) || 0;
-        }
-      });
-
-      // Standard sandbox node calculator fallback
-      const result = new Function(
-        ...Object.keys(variablesScope),
-        `return ${formula};`
-      )(...Object.values(variablesScope));
-
-      return typeof result === 'number' && !isNaN(result) ? result.toFixed(3) : "Err eval";
+      const result = math.evaluate(formula, variablesScope);
+      return typeof result === 'number' && Number.isFinite(result) ? result.toFixed(3) : "Err eval";
     } catch {
       return "#REF!";
     }

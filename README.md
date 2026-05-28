@@ -40,8 +40,12 @@ Useful variables:
 - `NODE_ENV`: `development` or `production`
 - `PORT`: server port, defaults to `3000`
 - `HOST`: bind host, defaults to `0.0.0.0`
+- `JWT_SECRET`: long random secret used to sign access tokens
+- `JWT_EXPIRES_IN`: token lifetime, defaults to `7d`
 - `GEMINI_API_KEY`: optional key for AI tutoring
 - `APP_URL`: deployed application URL
+
+The seeded local demo account is `guest@mathlab.edu` with password `mathlab-demo-password`.
 
 ## Development
 
@@ -82,7 +86,7 @@ git push -u origin main
 ## Roadmap
 
 1. Stabilize runtime scripts, docs, Node version, build warnings, and smoke checks.
-2. Replace mock auth with real JWT validation, BCrypt password hashing, route guards, validation, and secure headers.
+2. Expand security hardening with CSRF strategy, audit logging, and production secret management.
 3. Move from JSON storage to PostgreSQL migrations and repositories.
 4. Add focused unit and API tests for each math module.
 5. Replace placeholder CAS behavior with robust symbolic operations or a dedicated CAS service.

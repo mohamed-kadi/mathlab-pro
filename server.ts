@@ -1,7 +1,16 @@
 import express from "express";
+import type { NextFunction, Request, Response } from "express";
 import path from "path";
 import dotenv from "dotenv";
+import bcrypt from "bcryptjs";
+import helmet from "helmet";
+import jwt from "jsonwebtoken";
+import type { SignOptions } from "jsonwebtoken";
+import rateLimit from "express-rate-limit";
+import { z } from "zod";
+import crypto from "crypto";
 import { readDb, writeDb } from "./server/db.js";
+import type { DatabaseSchema, UserRecord } from "./server/db.js";
 import {
   calculateEigenvaluesAndVectors,
   solveNewtonRaphson,
@@ -21,6 +30,134 @@ const math = create(all);
 dotenv.config({ path: ".env.local", quiet: true });
 dotenv.config({ quiet: true });
 
+const DEMO_PASSWORD = "mathlab-demo-password";
+const JWT_SECRET = process.env.JWT_SECRET || "mathlab-pro-local-dev-secret-change-me";
+const JWT_EXPIRES_IN = (process.env.JWT_EXPIRES_IN || "7d") as SignOptions["expiresIn"];
+
+type AuthUser = Pick<UserRecord, "id" | "username" | "email" | "createdAt">;
+
+interface AuthenticatedRequest extends Request {
+  authUser?: AuthUser;
+}
+
+const registerSchema = z.object({
+  username: z.string().trim().min(2).max(40),
+  email: z.string().trim().email().max(254),
+  password: z.string().min(8).max(128)
+});
+
+const loginSchema = z.object({
+  email: z.string().trim().email().max(254),
+  password: z.string().min(1).max(128)
+});
+
+const sheetSchema = z.object({
+  id: z.string().min(1).max(80),
+  name: z.string().min(1).max(120),
+  cells: z.record(z.string(), z.string().max(500))
+});
+
+const projectSchema = z.object({
+  name: z.string().trim().min(1).max(120).optional(),
+  description: z.string().trim().max(1000).optional(),
+  sheets: z.array(sheetSchema).max(20).optional()
+});
+
+const historySchema = z.object({
+  type: z.enum(["polynomial", "algebra", "matrix", "numerical", "statistics", "calculus", "ai-explain"]),
+  input: z.string().max(4000),
+  output: z.string().max(8000),
+  latexInput: z.string().max(8000).optional(),
+  latexOutput: z.string().max(8000).optional(),
+  steps: z.array(z.string().max(4000)).max(200).optional(),
+  explanation: z.string().max(10000).optional()
+});
+
+function normalizeEmail(email: string) {
+  return email.trim().toLowerCase();
+}
+
+function safeUser(user: UserRecord): AuthUser {
+  return {
+    id: user.id,
+    username: user.username,
+    email: user.email,
+    createdAt: user.createdAt
+  };
+}
+
+function signToken(user: UserRecord) {
+  return jwt.sign(
+    {
+      sub: user.id,
+      username: user.username,
+      email: user.email
+    },
+    JWT_SECRET,
+    { expiresIn: JWT_EXPIRES_IN }
+  );
+}
+
+function extractBearerToken(req: Request) {
+  const authHeader = req.headers.authorization || "";
+  if (!authHeader.startsWith("Bearer ")) return null;
+  return authHeader.slice("Bearer ".length).trim();
+}
+
+function userFromToken(req: Request): AuthUser | null {
+  const token = extractBearerToken(req);
+  if (!token) return null;
+
+  try {
+    const payload = jwt.verify(token, JWT_SECRET);
+    const userId = typeof payload === "object" && payload && typeof payload.sub === "string" ? payload.sub : null;
+    if (!userId) return null;
+
+    const db = readDb();
+    const user = db.users.find(u => u.id === userId);
+    return user ? safeUser(user) : null;
+  } catch {
+    return null;
+  }
+}
+
+function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  const user = userFromToken(req);
+  if (!user) {
+    return res.status(401).json({ error: "Authentication required." });
+  }
+  req.authUser = user;
+  return next();
+}
+
+function validationError(res: Response, error: z.ZodError) {
+  return res.status(400).json({
+    error: "Invalid request body.",
+    details: error.issues.map(issue => ({
+      path: issue.path.join("."),
+      message: issue.message
+    }))
+  });
+}
+
+function isValidBcryptHash(hash: string) {
+  return /^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/.test(hash);
+}
+
+async function verifyPassword(user: UserRecord, password: string, db: DatabaseSchema) {
+  if (isValidBcryptHash(user.passwordHash)) {
+    return bcrypt.compare(password, user.passwordHash);
+  }
+
+  if (user.email === "guest@mathlab.edu" && password === DEMO_PASSWORD) {
+    user.passwordHash = await bcrypt.hash(password, 12);
+    writeDb(db);
+    return true;
+  }
+
+  return false;
+}
+
 async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT || 3000);
@@ -28,7 +165,22 @@ async function startServer() {
 
   // Middleware
   app.disable("x-powered-by");
-  app.use(express.json());
+  app.use(helmet({
+    contentSecurityPolicy: false
+  }));
+  app.use(express.json({ limit: "256kb" }));
+  app.use("/api/", rateLimit({
+    windowMs: 60_000,
+    limit: 120,
+    standardHeaders: true,
+    legacyHeaders: false
+  }));
+  app.use("/api/auth/", rateLimit({
+    windowMs: 15 * 60_000,
+    limit: 20,
+    standardHeaders: true,
+    legacyHeaders: false
+  }));
   app.use((_req, res, next) => {
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
@@ -46,89 +198,80 @@ async function startServer() {
 
   // --- Auth API ---
 
-  app.post("/api/auth/register", (req, res) => {
-    const { username, email, password } = req.body;
-    if (!username || !email || !password) {
-      return res.status(400).json({ error: "Missing registration parameters." });
-    }
+  app.post("/api/auth/register", async (req, res) => {
+    const parsed = registerSchema.safeParse(req.body);
+    if (!parsed.success) return validationError(res, parsed.error);
+
+    const { username, password } = parsed.data;
+    const email = normalizeEmail(parsed.data.email);
 
     const db = readDb();
-    const existing = db.users.find(u => u.email === email || u.username === username);
+    const existing = db.users.find(u => u.email.toLowerCase() === email || u.username.toLowerCase() === username.toLowerCase());
     if (existing) {
       return res.status(400).json({ error: "User on this email or username already exists." });
     }
 
     const newUser = {
-      id: "usr-" + Math.random().toString(36).substring(2, 9),
+      id: "usr-" + crypto.randomUUID(),
       username,
       email,
-      passwordHash: "$2b$10$hashed_mock_password", // BCrypt is simulated for simplicity on sandbox
+      passwordHash: await bcrypt.hash(password, 12),
       createdAt: new Date().toISOString()
     };
 
     db.users.push(newUser);
     writeDb(db);
 
-    const { passwordHash, ...safeUser } = newUser;
-    return res.json({ token: "jwt-token-" + safeUser.id, user: safeUser });
+    return res.json({ token: signToken(newUser), user: safeUser(newUser) });
   });
 
-  app.post("/api/auth/login", (req, res) => {
-    const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ error: "Missing login parameters" });
-    }
+  app.post("/api/auth/login", async (req, res) => {
+    const parsed = loginSchema.safeParse(req.body);
+    if (!parsed.success) return validationError(res, parsed.error);
+
+    const email = normalizeEmail(parsed.data.email);
+    const { password } = parsed.data;
 
     const db = readDb();
-    const user = db.users.find(u => u.email === email);
+    const user = db.users.find(u => u.email.toLowerCase() === email);
     if (!user) {
       return res.status(401).json({ error: "Invalid email or credentials" });
     }
 
-    const { passwordHash, ...safeUser } = user;
-    return res.json({ token: "jwt-token-" + safeUser.id, user: safeUser });
+    const passwordMatches = await verifyPassword(user, password, db);
+    if (!passwordMatches) {
+      return res.status(401).json({ error: "Invalid email or credentials" });
+    }
+
+    return res.json({ token: signToken(user), user: safeUser(user) });
   });
 
-  app.get("/api/auth/me", (req, res) => {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer jwt-token-")) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-
-    const userId = authHeader.replace("Bearer jwt-token-", "");
-    const db = readDb();
-    const user = db.users.find(u => u.id === userId);
-
-    if (!user) {
-      return res.status(401).json({ error: "User not found" });
-    }
-
-    const { passwordHash, ...safeUser } = user;
-    return res.json({ user: safeUser });
+  app.get("/api/auth/me", requireAuth, (req: AuthenticatedRequest, res) => {
+    return res.json({ user: req.authUser });
   });
 
   // --- Projects Workspace API ---
 
-  app.get("/api/projects", (req, res) => {
-    const authHeader = req.headers.authorization || "";
-    const userId = authHeader.replace("Bearer jwt-token-", "") || "admin";
+  app.get("/api/projects", requireAuth, (req: AuthenticatedRequest, res) => {
+    const userId = req.authUser!.id;
     const db = readDb();
     const userProjects = db.projects.filter(p => p.userId === userId);
     return res.json(userProjects);
   });
 
-  app.post("/api/projects", (req, res) => {
-    const authHeader = req.headers.authorization || "";
-    const userId = authHeader.replace("Bearer jwt-token-", "") || "admin";
-    const { name, description, sheets } = req.body;
+  app.post("/api/projects", requireAuth, (req: AuthenticatedRequest, res) => {
+    const parsed = projectSchema.safeParse(req.body);
+    if (!parsed.success) return validationError(res, parsed.error);
 
+    const userId = req.authUser!.id;
+    const { name, description, sheets } = parsed.data;
     const db = readDb();
     const newProject = {
-      id: "proj-" + Math.random().toString(36).substring(2, 9),
+      id: "proj-" + crypto.randomUUID(),
       userId,
       name: name || "Untitled Workspace Project",
       description: description || "No description provided.",
-      sheets: sheets || [{ id: "sheet-init", name: "Workspace 1", cells: {} }],
+      sheets: sheets || [{ id: "sheet-" + crypto.randomUUID(), name: "Workspace 1", cells: {} }],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -138,12 +281,15 @@ async function startServer() {
     return res.json(newProject);
   });
 
-  app.put("/api/projects/:id", (req, res) => {
+  app.put("/api/projects/:id", requireAuth, (req: AuthenticatedRequest, res) => {
+    const parsed = projectSchema.safeParse(req.body);
+    if (!parsed.success) return validationError(res, parsed.error);
+
     const { id } = req.params;
-    const { name, description, sheets } = req.body;
+    const { name, description, sheets } = parsed.data;
 
     const db = readDb();
-    const idx = db.projects.findIndex(p => p.id === id);
+    const idx = db.projects.findIndex(p => p.id === id && p.userId === req.authUser!.id);
     if (idx === -1) {
       return res.status(404).json({ error: "Project not found" });
     }
@@ -160,10 +306,14 @@ async function startServer() {
     return res.json(db.projects[idx]);
   });
 
-  app.delete("/api/projects/:id", (req, res) => {
+  app.delete("/api/projects/:id", requireAuth, (req: AuthenticatedRequest, res) => {
     const { id } = req.params;
     const db = readDb();
-    db.projects = db.projects.filter(p => p.id !== id);
+    const existing = db.projects.find(p => p.id === id && p.userId === req.authUser!.id);
+    if (!existing) {
+      return res.status(404).json({ error: "Project not found" });
+    }
+    db.projects = db.projects.filter(p => !(p.id === id && p.userId === req.authUser!.id));
     writeDb(db);
     return res.json({ success: true });
   });
@@ -171,22 +321,28 @@ async function startServer() {
   // --- Calculations History API ---
 
   app.get("/api/history", (req, res) => {
-    const authHeader = req.headers.authorization || "";
-    const userId = authHeader.replace("Bearer jwt-token-", "") || "admin";
+    const token = extractBearerToken(req);
+    const user = userFromToken(req);
+    if (token && !user) return res.status(401).json({ error: "Invalid or expired token." });
+    if (!user) return res.json([]);
+
     const db = readDb();
-    const fileHistory = db.calculationHistory.filter(h => h.userId === userId || !h.userId);
+    const fileHistory = db.calculationHistory.filter(h => h.userId === user.id);
     return res.json(fileHistory.reverse()); // Newest first
   });
 
   app.post("/api/history", (req, res) => {
-    const authHeader = req.headers.authorization || "";
-    const userId = authHeader.replace("Bearer jwt-token-", "") || "admin";
-    const { type, input, output, latexInput, latexOutput, steps, explanation } = req.body;
+    const parsed = historySchema.safeParse(req.body);
+    if (!parsed.success) return validationError(res, parsed.error);
 
-    const db = readDb();
+    const token = extractBearerToken(req);
+    const user = userFromToken(req);
+    if (token && !user) return res.status(401).json({ error: "Invalid or expired token." });
+
+    const { type, input, output, latexInput, latexOutput, steps, explanation } = parsed.data;
     const newItem = {
-      id: "hist-" + Math.random().toString(36).substring(2, 9),
-      userId,
+      id: "hist-" + crypto.randomUUID(),
+      ...(user ? { userId: user.id } : {}),
       type,
       input,
       output,
@@ -197,8 +353,11 @@ async function startServer() {
       createdAt: new Date().toISOString()
     };
 
-    db.calculationHistory.push(newItem);
-    writeDb(db);
+    if (user) {
+      const db = readDb();
+      db.calculationHistory.push(newItem);
+      writeDb(db);
+    }
     return res.json(newItem);
   });
 
