@@ -14,7 +14,7 @@ This repository is not yet the full Java/Spring Boot/PostgreSQL architecture fro
 - Numerical methods: Newton-Raphson, bisection, Simpson integration, and polynomial curve fitting.
 - Calculus tools: numerical limits, Taylor series, and RK4 ODE integration.
 - Statistics: descriptive statistics and confidence interval calculation.
-- Workspace persistence: saved expressions, projects, graph configurations, shared workspaces, and spreadsheet-style cells.
+- Workspace persistence: saved expressions, projects, graph configurations, shared workspaces, audit history, cache status, and spreadsheet-style cells.
 - Graphing: canvas-based 2D plotting with pan/zoom and traced coordinates.
 - Calculation caching: repeated math API calls use an in-process cache locally or Redis when `REDIS_URL` is configured.
 - Audit logging: successful auth, workspace, and authenticated calculation actions are recorded for the current user.
@@ -126,5 +126,5 @@ git push -u origin main
 3. Add focused unit and API tests for each math module.
 4. Replace placeholder CAS behavior with robust symbolic operations or a dedicated CAS service.
 5. Add OpenAPI documentation and deployment automation.
-6. Add frontend panels for saved expressions, graph libraries, audit history, and workspace sharing.
+6. Add richer frontend editing for saved graph viewport presets and shared workspace permissions.
 7. Evaluate whether to keep the Node backend or rebuild the backend in Java 21/Spring Boot to match the original prompt exactly.

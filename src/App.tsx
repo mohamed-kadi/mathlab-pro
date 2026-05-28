@@ -20,7 +20,8 @@ import {
   ArrowRight,
   RefreshCw,
   LogOut,
-  HelpCircle
+  HelpCircle,
+  Database
 } from 'lucide-react';
 import PolynomialPanel from './components/PolynomialPanel';
 import SymbolicAlgebra from './components/SymbolicAlgebra';
@@ -31,11 +32,12 @@ import CalculusSuite from './components/CalculusSuite';
 import AiMathGround from './components/AiMathGround';
 import WorkspaceSpreadsheet from './components/WorkspaceSpreadsheet';
 import GraphingEngine from './components/GraphingEngine';
+import WorkspaceOps from './components/WorkspaceOps';
 import { GraphEquation, HistoryItem, User as UserType } from './types';
 
 export default function App() {
   // Navigation State
-  const [activeTab, setActiveTab] = useState<'polynomial' | 'algebra' | 'matrix' | 'numerical' | 'statistics' | 'calculus' | 'ai-explain' | 'sheets'>('polynomial');
+  const [activeTab, setActiveTab] = useState<'polynomial' | 'algebra' | 'matrix' | 'numerical' | 'statistics' | 'calculus' | 'ai-explain' | 'sheets' | 'ops'>('polynomial');
 
   // Auth / Session States
   const [token, setToken] = useState<string | null>(() => localStorage.getItem('mathlab_token'));
@@ -281,6 +283,14 @@ export default function App() {
             <span>Workspaces Notebooks</span>
           </button>
 
+          <button
+            onClick={() => setActiveTab('ops')}
+            className={`p-2.5 rounded-lg flex items-center space-x-3 text-xs font-semibold tracking-wide transition cursor-pointer ${activeTab === 'ops' ? 'bg-slate-800 text-white border border-slate-700' : 'text-slate-450 hover:text-white hover:bg-slate-800/50'}`}
+          >
+            <Database className="w-4 h-4 text-indigo-400" />
+            <span>Workspace Operations</span>
+          </button>
+
           <div className="pt-4 flex flex-col space-y-2">
             <span className="text-[10px] text-slate-500 font-mono font-bold tracking-widest uppercase pb-1 px-2 block border-b border-slate-800/60">
               AI EXPERIMENTAL AGENTS
@@ -344,6 +354,14 @@ export default function App() {
             )}
             {activeTab === 'sheets' && (
               <WorkspaceSpreadsheet token={token} />
+            )}
+            {activeTab === 'ops' && (
+              <WorkspaceOps
+                token={token}
+                graphEquations={graphEquations}
+                onLoadGraphEquations={setGraphEquations}
+                onAddGraphEquation={handleAddGraphEquation}
+              />
             )}
             {activeTab === 'ai-explain' && (
               <AiMathGround onAddGraphEquation={handleAddGraphEquation} token={token} />

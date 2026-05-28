@@ -30,12 +30,13 @@ export interface HistoryItem {
 
 export interface Project {
   id: string;
+  userId?: string;
   name: string;
   description: string;
   createdAt: string;
   updatedAt: string;
   sheets: SpreadsheetData[];
-  history: HistoryItem[];
+  history?: HistoryItem[];
 }
 
 export interface SpreadsheetData {
@@ -82,4 +83,60 @@ export interface MatrixOperationResult {
   solution?: number[];
   steps?: string[];
   latexResult?: string;
+}
+
+export interface SavedExpression {
+  id: string;
+  userId: string;
+  name: string;
+  rawExpression: string;
+  latexExpression: string;
+  createdAt: string;
+}
+
+export interface GraphConfigurationRecord {
+  id: string;
+  userId: string;
+  projectId?: string;
+  name: string;
+  config: {
+    equations?: GraphEquation[];
+    viewport?: Record<string, unknown>;
+    [key: string]: unknown;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SharedWorkspace {
+  id: string;
+  projectId: string;
+  ownerUserId: string;
+  sharedWithUserId: string;
+  role: 'viewer' | 'editor';
+  createdAt: string;
+  projectName?: string;
+  ownerEmail?: string;
+  ownerUsername?: string;
+  sharedWithEmail?: string;
+  sharedWithUsername?: string;
+}
+
+export interface AuditLog {
+  id: string;
+  userId?: string;
+  action: string;
+  resource: string;
+  resourceId?: string;
+  metadata: Record<string, unknown>;
+  ipAddress?: string;
+  userAgent?: string;
+  createdAt: string;
+}
+
+export interface CacheStatus {
+  provider: 'memory' | 'redis';
+  enabled: boolean;
+  ttlSeconds: number;
+  redisUrl?: string;
 }
