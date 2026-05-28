@@ -25,6 +25,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -44,6 +51,10 @@ jobs:
         env:
           NODE_ENV: production
         run: npm run build
+
+      - name: Test Java backend
+        working-directory: backend-java
+        run: mvn test
 
       - name: Validate Docker Compose
         run: docker compose --profile tools config

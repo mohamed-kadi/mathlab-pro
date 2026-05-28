@@ -30,6 +30,7 @@ Architecture direction and API contract:
 
 - Node.js `>=20.19.0`
 - npm `>=10.0.0`
+- Java 21 and Maven 3.9+ for the Spring Boot backend scaffold in `backend-java/`
 
 Use the pinned local version with:
 
@@ -90,6 +91,14 @@ GitHub Actions runs `npm ci`, `npm run lint`, `npm test`, `npm run build`, and `
 
 MathLab Pro is moving contract-first toward a Java 21/Spring Boot production backend. The React frontend and API behavior should stay stable while the Java backend is built endpoint by endpoint. New backend work should use [docs/openapi.yaml](docs/openapi.yaml) as the source contract.
 
+The first Java backend scaffold is available under [backend-java](backend-java/README.md). It currently includes Spring Security JWT auth, PostgreSQL/Flyway schema, Redis cache configuration, health/cache endpoints, OpenAPI UI wiring, and MockMvc tests. Run it independently with:
+
+```bash
+cd backend-java
+mvn test
+mvn spring-boot:run
+```
+
 ## Build And Run
 
 ```bash
@@ -140,7 +149,7 @@ git push -u origin main
 1. Stabilize runtime scripts, docs, Node version, build warnings, and smoke checks.
 2. Expand security hardening with CSRF strategy, audit logging, and production secret management.
 3. Maintain portable API contract tests that can run against Node or Java.
-4. Scaffold the Java 21/Spring Boot backend under `backend-java/`.
-5. Port APIs incrementally against the OpenAPI contract.
+4. Continue hardening the Java 21/Spring Boot backend under `backend-java/`.
+5. Port remaining APIs incrementally against the OpenAPI contract.
 6. Add richer frontend editing for saved graph viewport presets and shared workspace permissions.
 7. Retire the Node backend after Java reaches contract parity.

@@ -3,6 +3,7 @@ build/
 dist/
 coverage/
 data/
+**/target/
 .DS_Store
 *.log
 .env*

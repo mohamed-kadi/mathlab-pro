@@ -1,0 +1,33 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:mathlabpro;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  flyway:
+    enabled: false
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    open-in-view: false
+  data:
+    redis:
+      repositories:
+        enabled: false
+
+management:
+  health:
+    redis:
+      enabled: false
+
+mathlab:
+  cache:
+    ttl-seconds: 900
+  jwt:
+    secret: mathlab-pro-test-secret-change-me-at-least-32-chars
+    expires-in: 7d
+
+logging:
+  level:
+    root: WARN
+    com.mathlabpro: INFO

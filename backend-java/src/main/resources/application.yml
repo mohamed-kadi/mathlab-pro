@@ -1,0 +1,38 @@
+server:
+  port: ${PORT:8080}
+
+spring:
+  application:
+    name: mathlab-pro-backend
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/mathlab_pro}
+    username: ${SPRING_DATASOURCE_USERNAME:mathlab}
+    password: ${SPRING_DATASOURCE_PASSWORD:mathlab_dev_password}
+  data:
+    redis:
+      url: ${REDIS_URL:redis://localhost:6379}
+  flyway:
+    enabled: true
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+mathlab:
+  cache:
+    ttl-seconds: ${CALCULATION_CACHE_TTL_SECONDS:900}
+  cors:
+    allowed-origins: ${APP_URL:http://localhost:3000,http://localhost:5173}
+  jwt:
+    secret: ${JWT_SECRET:mathlab-pro-local-dev-secret-change-me-at-least-32-chars}
+    expires-in: ${JWT_EXPIRES_IN:7d}
+
+springdoc:
+  api-docs:
+    version: openapi_3_1
