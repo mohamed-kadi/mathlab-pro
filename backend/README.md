@@ -45,12 +45,13 @@ The default runtime profile expects PostgreSQL. Tests use H2 with JPA schema gen
 - `/api/graph-configurations`
 - `/api/shared-workspaces`
 - `GET /api/audit-logs`
-- `/api/math/polynomial`, `/api/math/algebra`, `/api/math/matrix`, `/api/math/numerical`, `/api/math/calculus`, and `/api/math/statistics`
+- `/api/math/polynomial`, `/api/math/algebra`, `/api/math/matrix`, `/api/math/numerical`, `/api/math/calculus`, `/api/math/statistics`, and `/api/math/ai-explain`
 - Global validation/error responses
 - JWT issuance and resource server verification
 - Authenticated math audit logging
+- Canonical calculation cache headers for deterministic math endpoints
 
-The root contract remains `../docs/openapi.yaml`. The portable contract test suite in the repository root can target this backend once enough endpoints have been ported:
+The root contract remains `../docs/openapi.yaml`. To run the portable contract suite against a running Spring backend:
 
 ```bash
 MATHLAB_API_BASE_URL=http://localhost:8080 npm run test:contract

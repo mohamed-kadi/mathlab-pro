@@ -57,6 +57,7 @@ Useful variables:
 - `JWT_EXPIRES_IN`: token lifetime, defaults to `7d`
 - `REDIS_URL`: optional Redis endpoint for calculation caching
 - `CALCULATION_CACHE_TTL_SECONDS`: cache lifetime for repeated calculation responses, defaults to `900`
+- `CALCULATION_CACHE_MAX_ENTRIES`: maximum in-process calculation cache entries, defaults to `1000`
 - `AI_PROVIDER_BASE_URL`: optional OpenAI-compatible chat completions endpoint for AI tutoring
 - `AI_PROVIDER_API_KEY`: optional key for AI tutoring
 - `AI_PROVIDER_MODEL`: optional model name for AI tutoring
@@ -103,7 +104,7 @@ GitHub Actions runs `npm ci`, `npm run lint`, `npm test`, `npm run build`, and `
 
 MathLab Pro is moving contract-first toward a Java 21/Spring Boot production backend. The React frontend and API behavior should stay stable while the backend is built endpoint by endpoint. New backend work should use [docs/openapi.yaml](docs/openapi.yaml) as the source contract.
 
-The Spring Boot backend is available under [backend](backend/README.md). It currently includes Spring Security JWT auth, PostgreSQL/Flyway schema, Redis cache configuration, health/cache endpoints, deterministic math endpoints, OpenAPI UI wiring, and MockMvc tests. Run it independently with:
+The Spring Boot backend is available under [backend](backend/README.md). It currently includes Spring Security JWT auth, PostgreSQL/Flyway schema, cache configuration, health/cache endpoints, workspace APIs, deterministic math endpoints, AI explanation fallback, OpenAPI UI wiring, and MockMvc tests. Run it independently with:
 
 ```bash
 cd backend

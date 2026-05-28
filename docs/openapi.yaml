@@ -483,6 +483,8 @@ paths:
           headers:
             X-MathLab-Cache:
               $ref: "#/components/headers/CacheHeader"
+            X-MathLab-Cache-Key:
+              $ref: "#/components/headers/CacheKeyHeader"
           content:
             application/json:
               schema:
@@ -506,6 +508,11 @@ paths:
       responses:
         "200":
           description: Algebra result
+          headers:
+            X-MathLab-Cache:
+              $ref: "#/components/headers/CacheHeader"
+            X-MathLab-Cache-Key:
+              $ref: "#/components/headers/CacheKeyHeader"
           content:
             application/json:
               schema:
@@ -527,6 +534,11 @@ paths:
       responses:
         "200":
           description: Matrix result
+          headers:
+            X-MathLab-Cache:
+              $ref: "#/components/headers/CacheHeader"
+            X-MathLab-Cache-Key:
+              $ref: "#/components/headers/CacheKeyHeader"
           content:
             application/json:
               schema:
@@ -548,6 +560,11 @@ paths:
       responses:
         "200":
           description: Numerical result
+          headers:
+            X-MathLab-Cache:
+              $ref: "#/components/headers/CacheHeader"
+            X-MathLab-Cache-Key:
+              $ref: "#/components/headers/CacheKeyHeader"
           content:
             application/json:
               schema:
@@ -569,6 +586,11 @@ paths:
       responses:
         "200":
           description: Calculus result
+          headers:
+            X-MathLab-Cache:
+              $ref: "#/components/headers/CacheHeader"
+            X-MathLab-Cache-Key:
+              $ref: "#/components/headers/CacheKeyHeader"
           content:
             application/json:
               schema:
@@ -598,6 +620,11 @@ paths:
       responses:
         "200":
           description: Statistics result
+          headers:
+            X-MathLab-Cache:
+              $ref: "#/components/headers/CacheHeader"
+            X-MathLab-Cache-Key:
+              $ref: "#/components/headers/CacheKeyHeader"
           content:
             application/json:
               schema:
@@ -645,6 +672,11 @@ components:
       schema:
         type: string
         enum: [HIT, MISS]
+    CacheKeyHeader:
+      description: Stable canonical cache key for the calculation request.
+      schema:
+        type: string
+        pattern: "^mathlab:calc:[0-9a-f]{64}$"
 
   parameters:
     Id:

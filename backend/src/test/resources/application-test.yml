@@ -23,6 +23,7 @@ management:
 mathlab:
   cache:
     ttl-seconds: 900
+    max-entries: 1000
   jwt:
     secret: mathlab-pro-test-secret-change-me-at-least-32-chars
     expires-in: 7d

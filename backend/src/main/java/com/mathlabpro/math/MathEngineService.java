@@ -51,10 +51,12 @@ public class MathEngineService {
             ));
             case "derivative" -> {
                 Polynomial derivative = polynomial.derivative();
-                yield text(derivative.format(variable), derivative.format(variable), List.of(
+                String derivativeText = derivative.format(variable);
+                String output = equivalentFactoredOutput(derivative, variable);
+                yield text(output, derivativeText, List.of(
                     "Target function: f(" + variable + ") = " + expression,
                     "Applied the power rule term-by-term.",
-                    "Derivative: " + derivative.format(variable)
+                    "Derivative: " + output
                 ));
             }
             case "integrate" -> {
@@ -358,6 +360,13 @@ public class MathEngineService {
         }
         builder.setLength(builder.length() - 1);
         return builder.toString();
+    }
+
+    private static String equivalentFactoredOutput(Polynomial polynomial, String variable) {
+        String expanded = polynomial.format(variable);
+        String factored = factorPolynomial(polynomial, variable);
+        if (factored.equals(expanded) || factored.contains("irreducible")) return expanded;
+        return expanded + " = " + factored;
     }
 
     private static String factorForRoot(String variable, double root) {
