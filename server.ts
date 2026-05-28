@@ -14,7 +14,16 @@ import { createRepository, type MathLabRepository } from "./server/repository.js
 import { auditMiddleware } from "./server/audit.js";
 import { calculationCacheMiddleware, createCalculationCache } from "./server/cache.js";
 import {
+  MathValidationError,
+  assertSafeExpression,
   calculateEigenvaluesAndVectors,
+  dividePolynomialExpressions,
+  expandPolynomialExpression,
+  factorPolynomialExpression,
+  findPolynomialRootsExpression,
+  integratePolynomialExpression,
+  multiplyPolynomialExpressions,
+  normalizeVariableName,
   solveNewtonRaphson,
   solveBisection,
   numericalIntegration,
@@ -183,6 +192,53 @@ function validationError(res: Response, error: z.ZodError) {
       message: issue.message
     }))
   });
+}
+
+function mathError(res: Response, error: unknown) {
+  return res.status(400).json({
+    error: (error as Error).message
+  });
+}
+
+function parseNumericMatrix(value: unknown, label: string, maxSize = 10) {
+  if (!Array.isArray(value) || value.length === 0 || value.length > maxSize) {
+    throw new MathValidationError(`${label} must have between 1 and ${maxSize} rows.`);
+  }
+
+  const width = Array.isArray(value[0]) ? value[0].length : 0;
+  if (width === 0 || width > maxSize) {
+    throw new MathValidationError(`${label} must have between 1 and ${maxSize} columns.`);
+  }
+
+  const matrix = value.map(row => {
+    if (!Array.isArray(row) || row.length !== width) {
+      throw new MathValidationError(`${label} must be rectangular.`);
+    }
+    return row.map(cell => Number(cell));
+  });
+
+  if (matrix.some(row => row.some(cell => !Number.isFinite(cell)))) {
+    throw new MathValidationError(`${label} must contain only finite numbers.`);
+  }
+
+  return matrix;
+}
+
+function parseNumericVector(value: unknown, expectedLength: number, label: string) {
+  if (!Array.isArray(value) || value.length !== expectedLength) {
+    throw new MathValidationError(`${label} must contain exactly ${expectedLength} values.`);
+  }
+  const vector = value.map(cell => Number(cell));
+  if (vector.some(cell => !Number.isFinite(cell))) {
+    throw new MathValidationError(`${label} must contain only finite numbers.`);
+  }
+  return vector;
+}
+
+function assertSquareMatrix(matrix: number[][], label: string) {
+  if (matrix.length !== matrix[0].length) {
+    throw new MathValidationError(`${label} must be square for this operation.`);
+  }
 }
 
 function isValidBcryptHash(hash: string) {
@@ -579,12 +635,11 @@ export async function createApp() {
 
   // 1. Polynomial Suite Router
   app.post("/api/math/polynomial", (req, res) => {
-    const { expression, operation, operand2, variable = 'x' } = req.body;
-    if (!expression) {
-      return res.status(400).json({ error: "Missing math expression" });
-    }
+    const { operation, operand2 } = req.body;
 
     try {
+      const variable = normalizeVariableName(req.body.variable || 'x');
+      const expression = assertSafeExpression(req.body.expression, { variables: [variable] });
       let output = "";
       let latexOutput = "";
       let steps: string[] = [];
@@ -609,61 +664,46 @@ export async function createApp() {
           break;
         }
         case "integrate": {
-          // mathjs does not support full general integration out-of-the-box, we construct rule approximations or standard antiderivatives
-          steps.push(`1. Target integration: ∫ [${expression}] d${variable}`);
-          try {
-            // Check if standard polynomial ax^n
-            const node = math.parse(expression);
-            // Re-simplify for indefinite integration heuristic
-            output = `F(${variable}) = ∫ [${expression}] d${variable} + C (Use the numerical suite to compute precise definite areas)`;
-            latexOutput = `\\int \\left( ${node.toTex()} \\right) d${variable} = G(${variable}) + C`;
-            steps.push(`2. Identify anti-differentiation power expansions: ∫ x^n dx = (x^{n+1}) / (n+1)`);
-            steps.push(`3. Result finalized with constant integration offset +C.`);
-          } catch {
-            output = "Analytical integration too advanced. Use Numerical definite integral panel.";
-            latexOutput = "\\int f(x)dx = \\text{Overflow}";
-          }
+          const integrated = integratePolynomialExpression(expression, variable);
+          output = integrated.output;
+          latexOutput = integrated.latexOutput;
+          steps = integrated.steps;
           break;
         }
         case "divide": {
           if (!operand2) {
             return res.status(400).json({ error: "Operand 2 is required for polynomial division." });
           }
-          // Simple polynomial visual representation
-          output = `(${expression}) / (${operand2})`;
-          latexOutput = `\\frac{${math.parse(expression).toTex()}}{${math.parse(operand2).toTex()}}`;
-          steps = [
-            `1. Arrange dividend: ${expression}`,
-            `2. Arrange divisor: ${operand2}`,
-            `3. Factorize terms or render synthetically.`
-          ];
+          const safeOperand = assertSafeExpression(operand2, { variables: [variable] });
+          const divided = dividePolynomialExpressions(expression, safeOperand, variable);
+          output = divided.output;
+          latexOutput = divided.latexOutput;
+          steps = divided.steps;
           break;
         }
         case "multiply": {
           if (!operand2) {
             return res.status(400).json({ error: "Operand 2 is required for polynomial multiplication." });
           }
-          const simplifiedMulti = math.simplify(`(${expression}) * (${operand2})`);
-          output = simplifiedMulti.toString();
-          latexOutput = `\\left(${math.parse(expression).toTex()}\\right) \\cdot \\left(${math.parse(operand2).toTex()}\\right) = ${simplifiedMulti.toTex()}`;
-          steps = [
-            `1. Multiply equations: (${expression}) × (${operand2})`,
-            `2. Expand terms distributively (FOIL method).`,
-            `3. Re-aggregate constants: ${output}`
-          ];
+          const safeOperand = assertSafeExpression(operand2, { variables: [variable] });
+          const multiplied = multiplyPolynomialExpressions(expression, safeOperand, variable);
+          output = multiplied.output;
+          latexOutput = multiplied.latexOutput;
+          steps = multiplied.steps;
+          break;
+        }
+        case "factor": {
+          const factored = factorPolynomialExpression(expression, variable);
+          output = factored.output;
+          latexOutput = factored.latexOutput;
+          steps = factored.steps;
           break;
         }
         case "roots": {
-          // Find root around points
-          const solve1 = solveNewtonRaphson(expression, -2);
-          const solve2 = solveNewtonRaphson(expression, 2);
-          const rootsArr = [];
-          if (solve1.success) rootsArr.push(solve1.root);
-          if (solve2.success && Math.abs(solve2.root - solve1.root) > 1e-4) rootsArr.push(solve2.root);
-
-          output = rootsArr.length > 0 ? `Roots approximate: ${rootsArr.map(r => r.toFixed(5)).join(", ")}` : "No simple real roots detected within bound threshold.";
-          latexOutput = `x \\in \\left\\{ ${rootsArr.map(r => r.toFixed(4)).join(", ")} \\right\\}`;
-          steps = [...solve1.steps, ...solve2.steps];
+          const roots = findPolynomialRootsExpression(expression, variable);
+          output = roots.output;
+          latexOutput = roots.latexOutput;
+          steps = roots.steps;
           break;
         }
         default:
@@ -672,16 +712,19 @@ export async function createApp() {
 
       res.json({ output, latexOutput, steps });
     } catch (e) {
-      res.status(400).json({ error: (e as Error).message });
+      mathError(res, e);
     }
   });
 
   // 2. Symbolic Algebra Solver Router
   app.post("/api/math/algebra", (req, res) => {
-    const { expression, operation, variable, subValue } = req.body;
-    if (!expression) return res.status(400).json({ error: "Missing algebraic equation" });
+    const { operation, subValue } = req.body;
 
     try {
+      const variable = normalizeVariableName(req.body.variable || 'x');
+      const expression = assertSafeExpression(req.body.expression, {
+        variables: Array.from(new Set(['x', 'y', 'z', 'a', 'b', 'c', 't', variable]))
+      });
       let output = "";
       let latexOutput = "";
       let steps: string[] = [];
@@ -695,26 +738,34 @@ export async function createApp() {
           break;
         }
         case "expand": {
-          // mathjs simplify handles standard expansion
-          const result = math.simplify(expression);
-          output = result.toString();
-          latexOutput = result.toTex();
-          steps = [`Expanding expressions of: ${expression}`, `Distributed evaluation complete.`];
+          try {
+            const expanded = expandPolynomialExpression(expression, variable);
+            output = expanded.output;
+            latexOutput = expanded.latexOutput;
+            steps = expanded.steps;
+          } catch {
+            const result = math.simplify(expression);
+            output = result.toString();
+            latexOutput = result.toTex();
+            steps = [`Expanded using symbolic simplification rules for: ${expression}`, `Distributed evaluation complete where supported.`];
+          }
           break;
         }
         case "factor": {
-          // Factorisation approximation
-          const result = math.simplify(expression);
-          output = `Factorization model of: ${result.toString()}`;
-          latexOutput = result.toTex();
-          steps = [`Evaluate factor elements.`, `Group coefficients.`];
+          const factored = factorPolynomialExpression(expression, variable);
+          output = factored.output;
+          latexOutput = factored.latexOutput;
+          steps = factored.steps;
           break;
         }
         case "substitute": {
-          if (!variable || subValue === undefined) {
+          if (subValue === undefined) {
             return res.status(400).json({ error: "Substitution demands variable name and value parameters." });
           }
           const parsedVal = Number(subValue);
+          if (!Number.isFinite(parsedVal)) {
+            return res.status(400).json({ error: "Substitution value must be a finite number." });
+          }
           const scope: Record<string, number> = {};
           scope[variable] = parsedVal;
           const result = math.evaluate(expression, scope);
@@ -733,16 +784,13 @@ export async function createApp() {
 
       return res.json({ output, latexOutput, steps });
     } catch (e) {
-      return res.status(400).json({ error: (e as Error).message });
+      return mathError(res, e);
     }
   });
 
   // 3. Matrix Computation Suite Router
   app.post("/api/math/matrix", (req, res) => {
-    const { matrixA, matrixB, operation, vectorB } = req.body;
-    if (!matrixA || !Array.isArray(matrixA)) {
-      return res.status(400).json({ error: "Missing Matrix A input" });
-    }
+    const { matrixB, operation, vectorB } = req.body;
 
     try {
       let output = "";
@@ -750,12 +798,17 @@ export async function createApp() {
       let resultData: any = {};
       let steps: string[] = [];
 
+      const matrixA = parseNumericMatrix(req.body.matrixA, "Matrix A");
       const nodeA = math.matrix(matrixA);
 
       switch (operation) {
         case "add": {
           if (!matrixB) return res.status(400).json({ error: "Matrix B is required for addition." });
-          const sum = math.add(nodeA, math.matrix(matrixB));
+          const parsedB = parseNumericMatrix(matrixB, "Matrix B");
+          if (parsedB.length !== matrixA.length || parsedB[0].length !== matrixA[0].length) {
+            return res.status(400).json({ error: "Matrix addition requires matrices with matching dimensions." });
+          }
+          const sum = math.add(nodeA, math.matrix(parsedB));
           resultData = sum.toArray();
           output = "Matrix Sum successfully calculated.";
           latexResult = `A + B = \\begin{pmatrix} ${resultData.map((row: any) => row.join(" & ")).join(" \\\\ ")} \\end{pmatrix}`;
@@ -764,7 +817,11 @@ export async function createApp() {
         }
         case "multiply": {
           if (!matrixB) return res.status(400).json({ error: "Matrix B is required for multiplication." });
-          const product = math.multiply(nodeA, math.matrix(matrixB));
+          const parsedB = parseNumericMatrix(matrixB, "Matrix B");
+          if (matrixA[0].length !== parsedB.length) {
+            return res.status(400).json({ error: "Matrix multiplication requires columns(A) to equal rows(B)." });
+          }
+          const product = math.multiply(nodeA, math.matrix(parsedB));
           resultData = product.toArray();
           output = "Matrix multiplication computed successfully.";
           latexResult = `A \\cdot B = \\begin{pmatrix} ${resultData.map((row: any) => row.join(" & ")).join(" \\\\ ")} \\end{pmatrix}`;
@@ -772,6 +829,7 @@ export async function createApp() {
           break;
         }
         case "determinant": {
+          assertSquareMatrix(matrixA, "Matrix A");
           const det = math.det(nodeA);
           resultData = { determinant: det };
           output = `Determinant: det(A) = ${det}`;
@@ -783,6 +841,7 @@ export async function createApp() {
           break;
         }
         case "inverse": {
+          assertSquareMatrix(matrixA, "Matrix A");
           const inv = math.inv(nodeA) as any;
           resultData = inv.toArray();
           output = "Inversion matrix generated.";
@@ -791,6 +850,7 @@ export async function createApp() {
           break;
         }
         case "lu": {
+          assertSquareMatrix(matrixA, "Matrix A");
           const mathLup = math.lup(nodeA);
           const lData = (mathLup.L as any).toArray();
           const uData = (mathLup.U as any).toArray();
@@ -814,6 +874,7 @@ export async function createApp() {
           break;
         }
         case "eigen": {
+          assertSquareMatrix(matrixA, "Matrix A");
           const { eigenvalues, eigenvectors } = calculateEigenvaluesAndVectors(matrixA);
           resultData = { eigenvalues, eigenvectors };
           output = "Eigenvalues and eigenvectors approximation completed.";
@@ -827,7 +888,9 @@ export async function createApp() {
         }
         case "solveLinear": {
           if (!vectorB || !Array.isArray(vectorB)) return res.status(400).json({ error: "Missing Vector inputs for solving system" });
-          const solution = math.lusolve(nodeA, vectorB) as any;
+          assertSquareMatrix(matrixA, "Matrix A");
+          const parsedVector = parseNumericVector(vectorB, matrixA.length, "Vector b");
+          const solution = math.lusolve(nodeA, parsedVector) as any;
           resultData = solution.toArray ? solution.toArray().map((r: any) => r[0]) : solution;
           output = `System solutions: x = [${resultData.map((v: number) => v.toFixed(4)).join(", ")}]`;
           latexResult = `\\mathbf{x} = \\begin{pmatrix} ${resultData.map((v: number) => v.toFixed(4)).join(" \\\\ ")} \\end{pmatrix}`;
@@ -840,13 +903,13 @@ export async function createApp() {
 
       return res.json({ output, latexResult, result: resultData, steps });
     } catch (e) {
-      return res.status(400).json({ error: (e as Error).message });
+      return mathError(res, e);
     }
   });
 
   // 4. Numerical Analysis Suite Router
   app.post("/api/math/numerical", (req, res) => {
-    const { expression, method, initialGuess, a, b, points, degree } = req.body;
+    const { method, initialGuess, a, b, points, degree } = req.body;
 
     try {
       let output = "";
@@ -855,24 +918,39 @@ export async function createApp() {
 
       switch (method) {
         case "newton": {
-          if (expression === undefined || initialGuess === undefined) return res.status(400).json({ error: " Newton solver requires expression and initial guess" });
-          const nr = solveNewtonRaphson(expression, Number(initialGuess));
+          if (req.body.expression === undefined || initialGuess === undefined) return res.status(400).json({ error: " Newton solver requires expression and initial guess" });
+          const expression = assertSafeExpression(req.body.expression, { variables: ['x'] });
+          const guess = Number(initialGuess);
+          if (!Number.isFinite(guess)) return res.status(400).json({ error: "Initial guess must be a finite number." });
+          const nr = solveNewtonRaphson(expression, guess);
           output = `Root approximated: x ≈ ${nr.root.toFixed(7)}`;
           steps = nr.steps;
           resultsData = { root: nr.root };
           break;
         }
         case "bisection": {
-          if (expression === undefined || a === undefined || b === undefined) return res.status(400).json({ error: "Bisection solver requires expression, a, and b boundaries" });
-          const bisect = solveBisection(expression, Number(a), Number(b));
+          if (req.body.expression === undefined || a === undefined || b === undefined) return res.status(400).json({ error: "Bisection solver requires expression, a, and b boundaries" });
+          const expression = assertSafeExpression(req.body.expression, { variables: ['x'] });
+          const lower = Number(a);
+          const upper = Number(b);
+          if (!Number.isFinite(lower) || !Number.isFinite(upper) || lower === upper) {
+            return res.status(400).json({ error: "Bisection bounds must be distinct finite numbers." });
+          }
+          const bisect = solveBisection(expression, lower, upper);
           output = `Root approximated: x ≈ ${bisect.root.toFixed(7)}`;
           steps = bisect.steps;
           resultsData = { root: bisect.root };
           break;
         }
         case "integrate": {
-          if (expression === undefined || a === undefined || b === undefined) return res.status(400).json({ error: "Integration requires expression, a, and b boundaries" });
-          const numInt = numericalIntegration(expression, Number(a), Number(b));
+          if (req.body.expression === undefined || a === undefined || b === undefined) return res.status(400).json({ error: "Integration requires expression, a, and b boundaries" });
+          const expression = assertSafeExpression(req.body.expression, { variables: ['x'] });
+          const lower = Number(a);
+          const upper = Number(b);
+          if (!Number.isFinite(lower) || !Number.isFinite(upper) || lower === upper) {
+            return res.status(400).json({ error: "Integration bounds must be distinct finite numbers." });
+          }
+          const numInt = numericalIntegration(expression, lower, upper);
           output = `Numerical Area approximated: ${numInt.result.toFixed(8)}`;
           steps = numInt.steps;
           resultsData = { area: numInt.result };
@@ -881,7 +959,17 @@ export async function createApp() {
         case "curvefit": {
           if (!points || !Array.isArray(points)) return res.status(400).json({ error: "Curve fitting requires xy points coordinate array" });
           const currentDegree = degree ? Number(degree) : 1;
-          const fitResult = fitCurve(points, currentDegree);
+          if (!Number.isInteger(currentDegree) || currentDegree < 1 || currentDegree > 6) {
+            return res.status(400).json({ error: "Curve fitting degree must be an integer between 1 and 6." });
+          }
+          if (points.length <= currentDegree || points.length > 100) {
+            return res.status(400).json({ error: "Curve fitting requires more points than degree and at most 100 points." });
+          }
+          const numericPoints = points.map(point => ({ x: Number(point?.x), y: Number(point?.y) }));
+          if (numericPoints.some(point => !Number.isFinite(point.x) || !Number.isFinite(point.y))) {
+            return res.status(400).json({ error: "Curve fitting points must contain finite x and y values." });
+          }
+          const fitResult = fitCurve(numericPoints, currentDegree);
           output = `Equation Fit: y = ${fitResult.equation} (R² = ${fitResult.r2.toFixed(4)})`;
           steps = fitResult.steps;
           resultsData = fitResult;
@@ -893,13 +981,13 @@ export async function createApp() {
 
       return res.json({ output, steps, result: resultsData });
     } catch (e) {
-      return res.status(400).json({ error: (e as Error).message });
+      return mathError(res, e);
     }
   });
 
   // 5. Calculus Core Suite Router (Limits, Taylor expansion, ODE integration)
   app.post("/api/math/calculus", (req, res) => {
-    const { expression, operation, center, degree, x0, y0, xEnd, stepsCount } = req.body;
+    const { operation, center, degree, x0, y0, xEnd, stepsCount } = req.body;
 
     try {
       let output = "";
@@ -909,7 +997,9 @@ export async function createApp() {
 
       switch (operation) {
         case "limit": {
-          if (expression === undefined || center === undefined) return res.status(400).json({ error: "Limit approximation requires expression and target center coordinate" });
+          if (req.body.expression === undefined || center === undefined) return res.status(400).json({ error: "Limit approximation requires expression and target center coordinate" });
+          const expression = assertSafeExpression(req.body.expression, { variables: ['x'] });
+          if (!Number.isFinite(Number(center))) return res.status(400).json({ error: "Limit center must be a finite number." });
           const limResult = evaluateNumericalLimit(expression, Number(center));
           output = limResult.exists ? `Limit: ${limResult.limit?.toFixed(6)}` : `Limit does not exist. Reason: ${limResult.reason}`;
           latexOutput = `\\lim_{x \\to ${center}} \\left(${math.parse(expression).toTex()}\\right) = ${limResult.exists ? limResult.limit?.toFixed(4) : '\\text{Undefined}'}`;
@@ -918,8 +1008,11 @@ export async function createApp() {
           break;
         }
         case "taylor": {
-          if (expression === undefined || center === undefined) return res.status(400).json({ error: "Taylor expansion requires expression and center target value" });
+          if (req.body.expression === undefined || center === undefined) return res.status(400).json({ error: "Taylor expansion requires expression and center target value" });
+          const expression = assertSafeExpression(req.body.expression, { variables: ['x'] });
+          if (!Number.isFinite(Number(center))) return res.status(400).json({ error: "Taylor center must be a finite number." });
           const deg = degree ? Number(degree) : 4;
+          if (!Number.isInteger(deg) || deg < 0 || deg > 12) return res.status(400).json({ error: "Taylor degree must be an integer between 0 and 12." });
           const taylor = computeTaylorSeries(expression, Number(center), deg);
           output = `Taylor Polynomial: ${taylor.polynomial}`;
           latexOutput = `T_{${deg}}(x) = ${taylor.latex} + \\mathcal{O}(x^{${deg + 1}})`;
@@ -928,10 +1021,13 @@ export async function createApp() {
           break;
         }
         case "ode": {
-          if (expression === undefined || x0 === undefined || y0 === undefined || xEnd === undefined) {
+          if (req.body.expression === undefined || x0 === undefined || y0 === undefined || xEnd === undefined) {
             return res.status(400).json({ error: "Runge-Kutta ODE solver requires dy/dx expression, x0, y0, and xEnd values." });
           }
+          const expression = assertSafeExpression(req.body.expression, { variables: ['x', 'y'] });
           const stepsNum = stepsCount ? Number(stepsCount) : 100;
+          if (!Number.isInteger(stepsNum) || stepsNum < 1 || stepsNum > 5000) return res.status(400).json({ error: "ODE step count must be an integer between 1 and 5000." });
+          if (![x0, y0, xEnd].every(value => Number.isFinite(Number(value)))) return res.status(400).json({ error: "ODE coordinates must be finite numbers." });
           const rk4 = solveRK4(expression, Number(x0), Number(y0), Number(xEnd), stepsNum);
           output = `Integrated dy/dx at x = ${xEnd}: y(${xEnd}) ≈ ${rk4.finalY.toFixed(6)}`;
           latexOutput = `y(${xEnd}) \\approx ${rk4.finalY.toFixed(4)}`;
@@ -945,7 +1041,7 @@ export async function createApp() {
 
       return res.json({ output, latexOutput, steps, result: resultData });
     } catch (e) {
-      return res.status(400).json({ error: (e as Error).message });
+      return mathError(res, e);
     }
   });
 
@@ -955,9 +1051,17 @@ export async function createApp() {
     if (!series || !Array.isArray(series) || series.length === 0) {
       return res.status(400).json({ error: "Statistics series vector elements missing." });
     }
+    if (series.length > 10_000) {
+      return res.status(400).json({ error: "Statistics series cannot exceed 10,000 values." });
+    }
+
+    const numericSeries = series.map(value => Number(value));
+    if (numericSeries.some(value => !Number.isFinite(value))) {
+      return res.status(400).json({ error: "Statistics series must contain only finite numbers." });
+    }
 
     try {
-      const metrics = computeStatistics(series);
+      const metrics = computeStatistics(numericSeries);
       if (!metrics) return res.status(400).json({ error: "Failed to evaluate metrics." });
 
       const output = `Summary: Mean = ${metrics.mean.toFixed(3)}, Standard Deviation = ${metrics.stdDev.toFixed(3)}, Conf. Interval = [${metrics.confidenceInterval95.map(v => v.toFixed(3)).join(", ")}]`;
@@ -965,7 +1069,7 @@ export async function createApp() {
       
       const steps = [
         `1. Recieved numeric elements: size N = ${metrics.n}`,
-        `2. Sum terms = ${series.reduce((s, c) => s + c, 0).toFixed(2)}`,
+        `2. Sum terms = ${numericSeries.reduce((s, c) => s + c, 0).toFixed(2)}`,
         `3. Calculated mean: μ = sum / N = ${metrics.mean.toFixed(4)}`,
         `4. Computed variance summing squares (x_i - μ)²: s² = ${metrics.variance.toFixed(4)}`,
         `5. Standard deviation: s = √s² = ${metrics.stdDev.toFixed(4)}`

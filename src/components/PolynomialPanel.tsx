@@ -13,7 +13,7 @@ export default function PolynomialPanel({ onAddGraphEquation, onAddHistory, toke
   const [expression, setExpression] = useState("3*x^2 + 5*x - 2");
   const [operand2, setOperand2] = useState("x - 1");
   const [variable, setVariable] = useState("x");
-  const [operation, setOperation] = useState<'simplify' | 'derivative' | 'integrate' | 'divide' | 'multiply' | 'roots'>('simplify');
+  const [operation, setOperation] = useState<'simplify' | 'derivative' | 'integrate' | 'divide' | 'multiply' | 'factor' | 'roots'>('simplify');
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -89,7 +89,7 @@ export default function PolynomialPanel({ onAddGraphEquation, onAddHistory, toke
     <div className="flex flex-col space-y-5 p-1">
       <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl flex flex-col space-y-4 shadow-xl">
         <div className="flex flex-wrap items-center gap-2 border-b border-zinc-800 pb-3">
-          {(['simplify', 'derivative', 'integrate', 'roots', 'multiply', 'divide'] as const).map(op => (
+          {(['simplify', 'derivative', 'integrate', 'roots', 'factor', 'multiply', 'divide'] as const).map(op => (
             <button
               key={op}
               onClick={() => setOperation(op)}

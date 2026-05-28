@@ -8,8 +8,8 @@ This repository is not yet the full Java/Spring Boot/PostgreSQL architecture fro
 
 ## Current Capabilities
 
-- Polynomial operations: simplification, differentiation, heuristic integration, multiplication, division rendering, and approximate roots.
-- Symbolic algebra: simplification, expansion-style simplification, substitution, and placeholder factorization.
+- Polynomial operations: simplification, differentiation, exact univariate integration, multiplication, long division, factorization, and roots up to quadratic degree.
+- Symbolic algebra: simplification, polynomial expansion/factorization, and guarded variable substitution.
 - Matrix calculator: addition, multiplication, determinant, inverse, LU/LUP, QR, eigen approximation, and linear solve.
 - Numerical methods: Newton-Raphson, bisection, Simpson integration, and polynomial curve fitting.
 - Calculus tools: numerical limits, Taylor series, and RK4 ODE integration.
@@ -18,6 +18,7 @@ This repository is not yet the full Java/Spring Boot/PostgreSQL architecture fro
 - Graphing: canvas-based 2D plotting with pan/zoom and traced coordinates.
 - Calculation caching: repeated math API calls use an in-process cache locally or Redis when `REDIS_URL` is configured.
 - Audit logging: successful auth, workspace, and authenticated calculation actions are recorded for the current user.
+- Math safety: expression length, parse complexity, allowed symbols/functions, finite numeric inputs, and matrix dimensions are validated server-side.
 - AI tutoring: Gemini-backed explanations when `GEMINI_API_KEY` is configured, with offline fallback text otherwise.
 
 ## Requirements
@@ -123,8 +124,8 @@ git push -u origin main
 
 1. Stabilize runtime scripts, docs, Node version, build warnings, and smoke checks.
 2. Expand security hardening with CSRF strategy, audit logging, and production secret management.
-3. Add focused unit and API tests for each math module.
-4. Replace placeholder CAS behavior with robust symbolic operations or a dedicated CAS service.
+3. Add focused unit tests for each math module beyond the API smoke suite.
+4. Expand CAS coverage beyond quadratic univariate polynomials or add a dedicated CAS service.
 5. Add OpenAPI documentation and deployment automation.
 6. Add richer frontend editing for saved graph viewport presets and shared workspace permissions.
 7. Evaluate whether to keep the Node backend or rebuild the backend in Java 21/Spring Boot to match the original prompt exactly.

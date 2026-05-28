@@ -244,6 +244,55 @@ async function run() {
   assert.equal(userHistory.response.status, 200);
   assert.equal(userHistory.body[0].input, 'x^2');
 
+  const polynomialIntegral = await requestJson('/api/math/polynomial', {
+    method: 'POST',
+    headers: authHeaders,
+    body: JSON.stringify({ expression: 'x^2 + 2*x + 1', operation: 'integrate', variable: 'x' })
+  });
+  assert.equal(polynomialIntegral.response.status, 200);
+  assert.match(polynomialIntegral.body.output, /x\^3/);
+  assert.match(polynomialIntegral.body.output, /x\^2/);
+
+  const polynomialDivision = await requestJson('/api/math/polynomial', {
+    method: 'POST',
+    headers: authHeaders,
+    body: JSON.stringify({ expression: 'x^2 - 1', operand2: 'x - 1', operation: 'divide', variable: 'x' })
+  });
+  assert.equal(polynomialDivision.response.status, 200);
+  assert.match(polynomialDivision.body.output, /Quotient: x \+ 1/);
+  assert.match(polynomialDivision.body.output, /Remainder: 0/);
+
+  const polynomialFactor = await requestJson('/api/math/polynomial', {
+    method: 'POST',
+    headers: authHeaders,
+    body: JSON.stringify({ expression: 'x^2 - 5*x + 6', operation: 'factor', variable: 'x' })
+  });
+  assert.equal(polynomialFactor.response.status, 200);
+  assert.match(polynomialFactor.body.output, /\(x - 2\)/);
+  assert.match(polynomialFactor.body.output, /\(x - 3\)/);
+
+  const algebraFactor = await requestJson('/api/math/algebra', {
+    method: 'POST',
+    body: JSON.stringify({ expression: 'x^2 + 4*x - 12', operation: 'factor', variable: 'x' })
+  });
+  assert.equal(algebraFactor.response.status, 200);
+  assert.match(algebraFactor.body.output, /\(x - 2\)/);
+  assert.match(algebraFactor.body.output, /\(x \+ 6\)/);
+
+  const unsafeExpression = await requestJson('/api/math/polynomial', {
+    method: 'POST',
+    body: JSON.stringify({ expression: 'import(1)', operation: 'simplify', variable: 'x' })
+  });
+  assert.equal(unsafeExpression.response.status, 400);
+  assert.match(unsafeExpression.body.error, /not allowed/i);
+
+  const invalidMatrix = await requestJson('/api/math/matrix', {
+    method: 'POST',
+    body: JSON.stringify({ operation: 'determinant', matrixA: [[1, 2, 3], [4, 5, 6]] })
+  });
+  assert.equal(invalidMatrix.response.status, 400);
+  assert.match(invalidMatrix.body.error, /square/i);
+
   const derivative = await requestJson('/api/math/polynomial', {
     method: 'POST',
     headers: authHeaders,

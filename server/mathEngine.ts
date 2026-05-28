@@ -2,6 +2,492 @@ import { create, all } from 'mathjs';
 
 const math = create(all);
 
+const EXPRESSION_MAX_LENGTH = 1000;
+const EXPRESSION_MAX_NODES = 250;
+const EPSILON = 1e-10;
+
+const allowedFunctionNames = new Set([
+  'abs', 'acos', 'acosh', 'asin', 'asinh', 'atan', 'atan2', 'atanh',
+  'ceil', 'cos', 'cosh', 'cot', 'csc', 'cube', 'cbrt', 'exp',
+  'floor', 'log', 'log10', 'log2', 'max', 'min', 'pow', 'round',
+  'sec', 'sign', 'sin', 'sinh', 'sqrt', 'tan', 'tanh'
+]);
+
+const allowedConstantNames = new Set(['e', 'E', 'pi', 'PI', 'tau']);
+
+const blockedNodeTypes = new Set([
+  'AccessorNode',
+  'ArrayNode',
+  'AssignmentNode',
+  'BlockNode',
+  'FunctionAssignmentNode',
+  'IndexNode',
+  'ObjectNode',
+  'RangeNode'
+]);
+
+type Polynomial = Map<number, number>;
+
+export class MathValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'MathValidationError';
+  }
+}
+
+export interface ExpressionSafetyOptions {
+  variables?: string[];
+  maxLength?: number;
+  maxNodes?: number;
+}
+
+export function assertSafeExpression(expression: unknown, options: ExpressionSafetyOptions = {}) {
+  if (typeof expression !== 'string' || expression.trim().length === 0) {
+    throw new MathValidationError('A non-empty math expression is required.');
+  }
+
+  const source = expression.trim();
+  const maxLength = options.maxLength || EXPRESSION_MAX_LENGTH;
+  if (source.length > maxLength) {
+    throw new MathValidationError(`Expression is too long. Maximum length is ${maxLength} characters.`);
+  }
+
+  const allowedVariables = new Set(options.variables || ['x']);
+  const maxNodes = options.maxNodes || EXPRESSION_MAX_NODES;
+  const root = math.parse(source);
+  let nodeCount = 0;
+
+  (root as any).traverse((node: any, path: string, parent: any) => {
+    nodeCount += 1;
+    if (nodeCount > maxNodes) {
+      throw new MathValidationError(`Expression is too complex. Maximum parse nodes is ${maxNodes}.`);
+    }
+
+    if (blockedNodeTypes.has(node.type)) {
+      throw new MathValidationError(`Unsupported expression construct: ${node.type}.`);
+    }
+
+    if (node.type === 'FunctionNode') {
+      const fnName = node.fn?.name || node.name;
+      if (!fnName || !allowedFunctionNames.has(fnName)) {
+        throw new MathValidationError(`Function "${fnName || 'unknown'}" is not allowed.`);
+      }
+    }
+
+    if (node.type === 'SymbolNode') {
+      const isFunctionReference = parent?.type === 'FunctionNode' && path === 'fn';
+      if (
+        isFunctionReference ||
+        allowedVariables.has(node.name) ||
+        allowedConstantNames.has(node.name) ||
+        allowedFunctionNames.has(node.name)
+      ) {
+        return;
+      }
+      throw new MathValidationError(`Symbol "${node.name}" is not allowed for this operation.`);
+    }
+  });
+
+  return source;
+}
+
+export function normalizeVariableName(variable: unknown, fallback = 'x') {
+  const name = typeof variable === 'string' && variable.trim() ? variable.trim() : fallback;
+  if (!/^[A-Za-z][A-Za-z0-9_]{0,15}$/.test(name)) {
+    throw new MathValidationError('Variable name must start with a letter and contain only letters, numbers, or underscores.');
+  }
+  return name;
+}
+
+export function integratePolynomialExpression(expression: string, variable = 'x') {
+  const polynomial = parsePolynomialExpression(expression, variable);
+  const integrated = new Map<number, number>();
+  for (const [power, coefficient] of polynomial.entries()) {
+    integrated.set(power + 1, coefficient / (power + 1));
+  }
+
+  const formatted = formatPolynomial(integrated, variable);
+  const latex = polynomialLatex(formatted);
+  return {
+    output: `F(${variable}) = ${formatted} + C`,
+    latexOutput: `\\int \\left(${math.parse(expression).toTex()}\\right) d${variable} = ${latex} + C`,
+    steps: [
+      `Parsed ${expression} as a univariate polynomial in ${variable}.`,
+      `Applied the power rule term-by-term: integral of a*${variable}^n is a*${variable}^(n+1)/(n+1).`,
+      `Combined integrated terms: ${formatted} + C.`
+    ]
+  };
+}
+
+export function multiplyPolynomialExpressions(expression: string, operand: string, variable = 'x') {
+  const product = multiplyPolynomials(
+    parsePolynomialExpression(expression, variable),
+    parsePolynomialExpression(operand, variable)
+  );
+  const formatted = formatPolynomial(product, variable);
+  return {
+    output: formatted,
+    latexOutput: `\\left(${math.parse(expression).toTex()}\\right)\\left(${math.parse(operand).toTex()}\\right) = ${polynomialLatex(formatted)}`,
+    steps: [
+      `Parsed both operands as polynomials in ${variable}.`,
+      'Multiplied each term in the first polynomial by each term in the second polynomial.',
+      `Combined like powers of ${variable}: ${formatted}.`
+    ]
+  };
+}
+
+export function dividePolynomialExpressions(expression: string, divisorExpression: string, variable = 'x') {
+  const dividend = parsePolynomialExpression(expression, variable);
+  const divisor = parsePolynomialExpression(divisorExpression, variable);
+  const divisorDegree = polynomialDegree(divisor);
+  if (divisorDegree < 0) {
+    throw new MathValidationError('Polynomial division by zero is not allowed.');
+  }
+
+  const quotient = new Map<number, number>();
+  let remainder = clonePolynomial(dividend);
+  const steps = [
+    `Dividend degree: ${polynomialDegree(dividend)}. Divisor degree: ${divisorDegree}.`,
+    'Apply polynomial long division using leading terms.'
+  ];
+
+  while (polynomialDegree(remainder) >= divisorDegree && polynomialDegree(remainder) >= 0) {
+    const remDegree = polynomialDegree(remainder);
+    const leadingPower = remDegree - divisorDegree;
+    const leadingCoefficient = (remainder.get(remDegree) || 0) / (divisor.get(divisorDegree) || 1);
+    const term = new Map([[leadingPower, leadingCoefficient]]);
+    quotient.set(leadingPower, (quotient.get(leadingPower) || 0) + leadingCoefficient);
+    remainder = subtractPolynomials(remainder, multiplyPolynomials(divisor, term));
+    steps.push(`Cancel leading degree ${remDegree} with term ${formatPolynomial(term, variable)}.`);
+  }
+
+  const quotientText = formatPolynomial(quotient, variable);
+  const remainderText = formatPolynomial(remainder, variable);
+  return {
+    output: `Quotient: ${quotientText}; Remainder: ${remainderText}`,
+    latexOutput: `\\frac{${math.parse(expression).toTex()}}{${math.parse(divisorExpression).toTex()}} = ${polynomialLatex(quotientText)}${polynomialDegree(remainder) >= 0 ? ` + \\frac{${polynomialLatex(remainderText)}}{${math.parse(divisorExpression).toTex()}}` : ''}`,
+    steps: [...steps, `Final quotient is ${quotientText}.`, `Final remainder is ${remainderText}.`]
+  };
+}
+
+export function expandPolynomialExpression(expression: string, variable = 'x') {
+  const polynomial = parsePolynomialExpression(expression, variable);
+  const formatted = formatPolynomial(polynomial, variable);
+  return {
+    output: formatted,
+    latexOutput: polynomialLatex(formatted),
+    steps: [
+      `Parsed expression as a polynomial in ${variable}.`,
+      `Expanded products and powers into coefficients by degree.`,
+      `Combined equivalent powers: ${formatted}.`
+    ]
+  };
+}
+
+export function factorPolynomialExpression(expression: string, variable = 'x') {
+  const polynomial = parsePolynomialExpression(expression, variable);
+  const degree = polynomialDegree(polynomial);
+  const formatted = formatPolynomial(polynomial, variable);
+
+  if (degree === 0) {
+    return {
+      output: formatted,
+      latexOutput: polynomialLatex(formatted),
+      steps: ['Constant expressions are already factored.']
+    };
+  }
+
+  if (degree === 1) {
+    const a = polynomial.get(1) || 0;
+    const b = polynomial.get(0) || 0;
+    const root = -b / a;
+    const factored = `${formatCoefficient(a)}*${formatRootFactor(variable, root)}`;
+    return {
+      output: normalizeLeadingOne(factored),
+      latexOutput: polynomialLatex(normalizeLeadingOne(factored)),
+      steps: [`Solved ${formatPolynomial(polynomial, variable)} = 0 for root ${variable} = ${formatNumber(root)}.`, 'Rewrote the linear polynomial from its root.']
+    };
+  }
+
+  if (degree === 2) {
+    const a = polynomial.get(2) || 0;
+    const b = polynomial.get(1) || 0;
+    const c = polynomial.get(0) || 0;
+    const discriminant = b * b - 4 * a * c;
+    if (discriminant < -EPSILON) {
+      return {
+        output: `${formatted} is irreducible over the real numbers.`,
+        latexOutput: polynomialLatex(formatted),
+        steps: [`Discriminant Δ = ${formatNumber(discriminant)} < 0, so no real linear factors exist.`]
+      };
+    }
+    const sqrtDisc = Math.sqrt(Math.max(0, discriminant));
+    const root1 = (-b + sqrtDisc) / (2 * a);
+    const root2 = (-b - sqrtDisc) / (2 * a);
+    const leading = Math.abs(a - 1) < EPSILON ? '' : `${formatCoefficient(a)}*`;
+    const factored = `${leading}${formatRootFactor(variable, root1)}*${formatRootFactor(variable, root2)}`;
+    return {
+      output: normalizeLeadingOne(factored),
+      latexOutput: polynomialLatex(normalizeLeadingOne(factored)),
+      steps: [
+        `Quadratic coefficients: a = ${formatNumber(a)}, b = ${formatNumber(b)}, c = ${formatNumber(c)}.`,
+        `Discriminant Δ = b^2 - 4ac = ${formatNumber(discriminant)}.`,
+        `Roots are ${formatNumber(root1)} and ${formatNumber(root2)}; convert roots into linear factors.`
+      ]
+    };
+  }
+
+  return {
+    output: `Expanded form: ${formatted}. Full symbolic factorization currently supports degree 2 or lower.`,
+    latexOutput: polynomialLatex(formatted),
+    steps: [
+      `Parsed polynomial degree ${degree}.`,
+      'Exact linear/quadratic factorization is available; higher-degree factorization is intentionally not guessed.'
+    ]
+  };
+}
+
+export function findPolynomialRootsExpression(expression: string, variable = 'x') {
+  const polynomial = parsePolynomialExpression(expression, variable);
+  const degree = polynomialDegree(polynomial);
+  if (degree < 1) {
+    return {
+      output: 'Constant polynomial has no variable roots.',
+      latexOutput: '\\varnothing',
+      roots: [] as number[],
+      steps: ['Detected a constant polynomial.']
+    };
+  }
+
+  if (degree === 1) {
+    const root = -(polynomial.get(0) || 0) / (polynomial.get(1) || 1);
+    return {
+      output: `Root: ${variable} = ${formatNumber(root)}`,
+      latexOutput: `${variable} = ${formatNumber(root)}`,
+      roots: [root],
+      steps: ['Solved the linear equation a*x + b = 0.']
+    };
+  }
+
+  if (degree === 2) {
+    const a = polynomial.get(2) || 0;
+    const b = polynomial.get(1) || 0;
+    const c = polynomial.get(0) || 0;
+    const discriminant = b * b - 4 * a * c;
+    if (discriminant < -EPSILON) {
+      const real = -b / (2 * a);
+      const imaginary = Math.sqrt(-discriminant) / (2 * Math.abs(a));
+      return {
+        output: `Complex roots: ${formatNumber(real)} ± ${formatNumber(imaginary)}i`,
+        latexOutput: `${variable} = ${formatNumber(real)} \\pm ${formatNumber(imaginary)}i`,
+        roots: [] as number[],
+        steps: [`Discriminant Δ = ${formatNumber(discriminant)} < 0, so real roots do not exist.`]
+      };
+    }
+    const sqrtDisc = Math.sqrt(Math.max(0, discriminant));
+    const roots = [(-b + sqrtDisc) / (2 * a), (-b - sqrtDisc) / (2 * a)];
+    const uniqueRoots = roots.filter((root, index) => roots.findIndex(candidate => Math.abs(candidate - root) < EPSILON) === index);
+    return {
+      output: `Roots: ${uniqueRoots.map(root => `${variable} = ${formatNumber(root)}`).join(', ')}`,
+      latexOutput: `${variable} \\in \\left\\{ ${uniqueRoots.map(formatNumber).join(', ')} \\right\\}`,
+      roots: uniqueRoots,
+      steps: [
+        `Quadratic coefficients: a = ${formatNumber(a)}, b = ${formatNumber(b)}, c = ${formatNumber(c)}.`,
+        `Discriminant Δ = ${formatNumber(discriminant)}.`,
+        'Applied the quadratic formula.'
+      ]
+    };
+  }
+
+  throw new MathValidationError('Exact polynomial roots currently support degree 2 or lower. Use numerical methods for higher-degree roots.');
+}
+
+function parsePolynomialExpression(expression: string, variable: string): Polynomial {
+  return normalizePolynomial(polynomialFromNode(math.parse(expression), variable));
+}
+
+function polynomialFromNode(node: any, variable: string): Polynomial {
+  if (node.type === 'ParenthesisNode') {
+    return polynomialFromNode(node.content, variable);
+  }
+
+  if (node.type === 'ConstantNode') {
+    return new Map([[0, Number(node.value)]]);
+  }
+
+  if (node.type === 'SymbolNode') {
+    if (node.name === variable) return new Map([[1, 1]]);
+    if (allowedConstantNames.has(node.name)) {
+      const constantValue = node.name === 'tau' ? 2 * Math.PI : Number(math.evaluate(node.name));
+      return new Map([[0, constantValue]]);
+    }
+    throw new MathValidationError(`"${node.name}" is not a valid polynomial variable here.`);
+  }
+
+  if (node.type !== 'OperatorNode') {
+    throw new MathValidationError(`Only polynomial arithmetic is supported for this operation. Found ${node.type}.`);
+  }
+
+  const args = node.args || [];
+  if (node.op === '+' && args.length === 2) {
+    return addPolynomials(polynomialFromNode(args[0], variable), polynomialFromNode(args[1], variable));
+  }
+  if (node.op === '-' && args.length === 2) {
+    return subtractPolynomials(polynomialFromNode(args[0], variable), polynomialFromNode(args[1], variable));
+  }
+  if (node.op === '-' && args.length === 1) {
+    return scalePolynomial(polynomialFromNode(args[0], variable), -1);
+  }
+  if (node.op === '*' && args.length === 2) {
+    return multiplyPolynomials(polynomialFromNode(args[0], variable), polynomialFromNode(args[1], variable));
+  }
+  if (node.op === '/' && args.length === 2) {
+    const numerator = polynomialFromNode(args[0], variable);
+    const denominator = polynomialFromNode(args[1], variable);
+    if (polynomialDegree(denominator) !== 0) {
+      throw new MathValidationError('Polynomial terms may only be divided by numeric constants.');
+    }
+    const constant = denominator.get(0) || 0;
+    if (Math.abs(constant) < EPSILON) {
+      throw new MathValidationError('Division by zero is not allowed.');
+    }
+    return scalePolynomial(numerator, 1 / constant);
+  }
+  if (node.op === '^' && args.length === 2) {
+    const exponentPoly = polynomialFromNode(args[1], variable);
+    if (polynomialDegree(exponentPoly) !== 0) {
+      throw new MathValidationError('Polynomial exponents must be fixed non-negative integers.');
+    }
+    const exponent = exponentPoly.get(0) || 0;
+    if (!Number.isInteger(exponent) || exponent < 0 || exponent > 20) {
+      throw new MathValidationError('Polynomial exponents must be integers between 0 and 20.');
+    }
+    return powPolynomial(polynomialFromNode(args[0], variable), exponent);
+  }
+
+  throw new MathValidationError(`Unsupported polynomial operator "${node.op}".`);
+}
+
+function clonePolynomial(polynomial: Polynomial): Polynomial {
+  return new Map(polynomial.entries());
+}
+
+function normalizePolynomial(polynomial: Polynomial): Polynomial {
+  const normalized = new Map<number, number>();
+  for (const [power, coefficient] of polynomial.entries()) {
+    if (Math.abs(coefficient) > EPSILON) {
+      normalized.set(power, coefficient);
+    }
+  }
+  return normalized;
+}
+
+function polynomialDegree(polynomial: Polynomial) {
+  const normalized = normalizePolynomial(polynomial);
+  if (normalized.size === 0) return -1;
+  return Math.max(...normalized.keys());
+}
+
+function addPolynomials(left: Polynomial, right: Polynomial): Polynomial {
+  const result = clonePolynomial(left);
+  for (const [power, coefficient] of right.entries()) {
+    result.set(power, (result.get(power) || 0) + coefficient);
+  }
+  return normalizePolynomial(result);
+}
+
+function subtractPolynomials(left: Polynomial, right: Polynomial): Polynomial {
+  return addPolynomials(left, scalePolynomial(right, -1));
+}
+
+function scalePolynomial(polynomial: Polynomial, factor: number): Polynomial {
+  const result = new Map<number, number>();
+  for (const [power, coefficient] of polynomial.entries()) {
+    result.set(power, coefficient * factor);
+  }
+  return normalizePolynomial(result);
+}
+
+function multiplyPolynomials(left: Polynomial, right: Polynomial): Polynomial {
+  const result = new Map<number, number>();
+  for (const [leftPower, leftCoefficient] of left.entries()) {
+    for (const [rightPower, rightCoefficient] of right.entries()) {
+      const power = leftPower + rightPower;
+      result.set(power, (result.get(power) || 0) + leftCoefficient * rightCoefficient);
+    }
+  }
+  return normalizePolynomial(result);
+}
+
+function powPolynomial(polynomial: Polynomial, exponent: number): Polynomial {
+  let result: Polynomial = new Map([[0, 1]]);
+  for (let i = 0; i < exponent; i++) {
+    result = multiplyPolynomials(result, polynomial);
+  }
+  return result;
+}
+
+function formatPolynomial(polynomial: Polynomial, variable: string) {
+  const normalized = normalizePolynomial(polynomial);
+  if (normalized.size === 0) return '0';
+
+  return [...normalized.entries()]
+    .sort(([leftPower], [rightPower]) => rightPower - leftPower)
+    .map(([power, coefficient], index) => {
+      const sign = coefficient < 0 ? '-' : index === 0 ? '' : '+';
+      const term = formatTerm(Math.abs(coefficient), power, variable);
+      return `${sign}${sign ? ' ' : ''}${term}`;
+    })
+    .join(' ')
+    .trim();
+}
+
+function formatTerm(coefficient: number, power: number, variable: string) {
+  if (power === 0) return formatNumber(coefficient);
+  const variablePart = power === 1 ? variable : `${variable}^${power}`;
+  if (Math.abs(coefficient - 1) < EPSILON) return variablePart;
+  return `${formatCoefficient(coefficient)}*${variablePart}`;
+}
+
+function formatCoefficient(coefficient: number) {
+  return formatNumber(coefficient);
+}
+
+function formatNumber(value: number) {
+  if (Math.abs(value) < EPSILON) return '0';
+  if (Number.isInteger(value)) return String(value);
+
+  const sign = value < 0 ? '-' : '';
+  const absolute = Math.abs(value);
+  for (let denominator = 2; denominator <= 100; denominator++) {
+    const numerator = Math.round(absolute * denominator);
+    if (Math.abs(absolute - numerator / denominator) < 1e-8) {
+      return `${sign}${numerator}/${denominator}`;
+    }
+  }
+
+  return String(Number(value.toFixed(8)));
+}
+
+function polynomialLatex(formatted: string) {
+  try {
+    return math.parse(formatted).toTex();
+  } catch {
+    return formatted;
+  }
+}
+
+function formatRootFactor(variable: string, root: number) {
+  if (Math.abs(root) < EPSILON) return variable;
+  return root > 0
+    ? `(${variable} - ${formatNumber(root)})`
+    : `(${variable} + ${formatNumber(Math.abs(root))})`;
+}
+
+function normalizeLeadingOne(expression: string) {
+  return expression.replace(/^1\*/, '').replace(/^-1\*/, '-');
+}
+
 // --- Eigenvalues and Eigenvectors (QR Algorithm) ---
 /**
  * Calculates eigenvalues and optionally eigenvectors of a square, real matrix using QR iteration
@@ -160,7 +646,7 @@ export function solveBisection(expression: string, a: number, b: number, maxIter
   
   const f = (val: number): number => code.evaluate({ x: val });
   
-  const fa = f(a);
+  let fa = f(a);
   const fb = f(b);
   
   steps.push(`Bisection intervals: [a, b] = [${a}, ${b}], f(a) = ${fa.toFixed(4)}, f(b) = ${fb.toFixed(4)}`);
@@ -187,6 +673,7 @@ export function solveBisection(expression: string, a: number, b: number, maxIter
       b = mid;
     } else {
       a = mid;
+      fa = fmid;
     }
   }
   
